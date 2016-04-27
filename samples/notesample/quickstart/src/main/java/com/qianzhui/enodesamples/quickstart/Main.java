@@ -23,32 +23,32 @@ public class Main {
         boolean isONS = true;
         /**============= Enode所需消息队列配置，RocketMQ实现 ======*/
         Properties producerSetting = new Properties();
-        producerSetting.setProperty(NativePropertyKey.NAMESRV_ADDR, "test.jishulink.com:9876");
+        producerSetting.setProperty(NativePropertyKey.NAMESRV_ADDR, "xxx.com:9876"); //RocketMQ地址自定义
         producerSetting.setProperty(NativePropertyKey.ProducerGroup, "NoteSampleProducerGroup");
 
         Properties consumerSetting = new Properties();
-        consumerSetting.setProperty(NativePropertyKey.NAMESRV_ADDR, "test.jishulink.com:9876");
+        consumerSetting.setProperty(NativePropertyKey.NAMESRV_ADDR, "xxx.com:9876"); //RocketMQ地址自定义
         consumerSetting.setProperty(NativePropertyKey.ConsumerGroup, "NoteSampleConsumerGroup");
         /**=============================================================*/
 
         /**============= Enode所需消息队列配置，ONS实现 ======*/
         producerSetting = new Properties();
         producerSetting.setProperty(PropertyKeyConst.ProducerId, "PID_NoteSample");
-        producerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
-        producerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
+        producerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey"); // AccessKey需自定义
+        producerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey"); // SecretKey需自定义
 
         consumerSetting = new Properties();
         consumerSetting.setProperty(PropertyKeyConst.ConsumerId, "CID_NoteSample");
-        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
-        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
+        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey");// AccessKey需自定义
+        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey");// SecretKey需自定义
         /**=============================================================*/
 
         /**============= Enode数据库配置（内存实现不需要配置） ===========*/
         Properties properties = new Properties();
         properties.setProperty("driverClassName", "com.mysql.jdbc.Driver");
-        properties.setProperty("url", "jdbc:mysql://localhost:3306/enode_new");
-        properties.setProperty("username", "root");
-        properties.setProperty("password", "coffee");
+        properties.setProperty("url", "jdbc:mysql://localhost:3306/enode");
+        properties.setProperty("username", "username");
+        properties.setProperty("password", "password");
         properties.setProperty("initialSize", "1");
         properties.setProperty("maxTotal", "1");
         BasicDataSource dataSource = BasicDataSourceFactory.createDataSource(properties);
