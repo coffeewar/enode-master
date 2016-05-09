@@ -506,8 +506,7 @@ public class ENode {
             RocketMQConsumer rocketMQConsumer = ObjectContainer.resolve(RocketMQConsumer.class);
             topics.stream().forEach(topic -> rocketMQConsumer.subscribe(topic, "*"));
 
-            RocketMQConsumer consumer = ObjectContainer.resolve(RocketMQConsumer.class);
-            consumer.start();
+            rocketMQConsumer.start();
         }
 
         //Start MQProducer and any register publishers(CommandService、DomainEventPublisher、ApplicationMessagePublisher、PublishableExceptionPublisher)
