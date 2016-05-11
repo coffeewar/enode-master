@@ -1,7 +1,8 @@
 package com.qianzhui.enode.infrastructure;
 
+import com.qianzhui.enode.common.utilities.ObjectId;
+
 import java.util.Date;
-import java.util.UUID;
 
 /**
  * Created by junbo_xu on 2016/2/24.
@@ -12,9 +13,8 @@ public abstract class Message implements IMessage {
     private int _sequence;
 
     public Message() {
-        //todo guid
-        //id = ObjectId.GenerateNewStringId();
-        _id = UUID.randomUUID().toString();
+        _id = ObjectId.generateNewStringId();
+//        _id = UUID.randomUUID().toString();
         _timestamp = new Date();
         _sequence = 1;
     }

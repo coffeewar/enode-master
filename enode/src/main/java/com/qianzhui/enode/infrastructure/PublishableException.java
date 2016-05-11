@@ -1,8 +1,9 @@
 package com.qianzhui.enode.infrastructure;
 
+import com.qianzhui.enode.common.utilities.ObjectId;
+
 import java.util.Date;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Created by junbo_xu on 2016/4/5.
@@ -15,9 +16,8 @@ public abstract class PublishableException extends Exception implements IPublish
     private int sequence;
 
     public PublishableException() {
-        //TODO ObjectId.GenerateNewStringId();
-        //id = ObjectId.GenerateNewStringId();
-        id = UUID.randomUUID().toString();
+        id = ObjectId.generateNewStringId();
+//        id = UUID.randomUUID().toString();
         timestamp = new Date();
         sequence = 1;
     }
