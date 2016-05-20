@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/4/5.
  */
 public class DomainEventStreamMessage extends SequenceMessage<String> {
+
+    public static final String DOMAIN_EVENT_TAG = "DomainEventStream";
+
     private String commandId;
     private Map<String, String> items;
     private List<IDomainEvent> events;
@@ -60,5 +63,13 @@ public class DomainEventStreamMessage extends SequenceMessage<String> {
 
     public void setEvents(List<IDomainEvent> events) {
         this.events = events;
+    }
+
+    public String getTag() {
+        if (events.size() == 1) {
+            return events.get(0).getClass().getName();
+        } else {
+            return DOMAIN_EVENT_TAG;
+        }
     }
 }

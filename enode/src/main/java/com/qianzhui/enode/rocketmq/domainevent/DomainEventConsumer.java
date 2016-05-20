@@ -62,7 +62,14 @@ public class DomainEventConsumer {
         _consumer.registerMessageHandler(new RocketMQMessageHandler() {
             @Override
             public boolean isMatched(String messageTags) {
-                return messageTags != null && messageTags.equals("DOMAIN_EVENT");
+                if(messageTags != null) {
+                    if(messageTags.equals(DomainEventStreamMessage.DOMAIN_EVENT_TAG))
+                        return true;
+
+                    Class type = _typeNameProvider.getType(messageTags);
+                    return IDomainEvent.class.isAssignableFrom(type);
+                }
+                return false;
             }
 
             @Override

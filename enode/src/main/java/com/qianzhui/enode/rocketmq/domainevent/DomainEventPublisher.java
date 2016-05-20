@@ -70,7 +70,7 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
 
         //TODO eventstream tags
         //TODO rocketmq message key of eventstream,default:eventStream.id()
-        return new Message(topic, "DOMAIN_EVENT", eventStream.id(),
+        return new Message(topic, eventStream.getTag(), eventStream.id(),
                 RocketMQMessageTypeCode.DomainEventStreamMessage.getValue(), body, true);
     }
 
