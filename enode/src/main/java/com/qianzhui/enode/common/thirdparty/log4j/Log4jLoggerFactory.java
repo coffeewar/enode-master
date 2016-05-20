@@ -13,6 +13,10 @@ import java.net.URL;
  */
 public class Log4jLoggerFactory implements ILoggerFactory {
     public Log4jLoggerFactory(String configFile) {
+        if(configFile == null) {
+            configFile = "log4j.properties";
+        }
+
         if(configFile != null){
             File file = new File(configFile);
             if (!file.exists()) {
