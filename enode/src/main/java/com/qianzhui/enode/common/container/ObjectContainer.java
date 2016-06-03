@@ -3,6 +3,8 @@ package com.qianzhui.enode.common.container;
 import com.google.inject.Provider;
 import com.qianzhui.enode.common.thirdparty.guice.GuiceModule;
 
+import java.util.Properties;
+
 /**
  * Created by junbo_xu on 2016/2/26.
  */
@@ -133,6 +135,10 @@ public class ObjectContainer {
 
     public static <TService, TImplementer extends TService> void registerInstance(GenericTypeLiteral<TService> genericTypeLiteral, TImplementer instance) {
         current.registerInstance(genericTypeLiteral, instance);
+    }
+
+    public static void registerProperties(Properties properties){
+        current.registerProperties(properties);
     }
 
     public static <TService> TService resolve(Class<TService> serviceType) {

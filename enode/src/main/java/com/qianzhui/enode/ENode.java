@@ -17,23 +17,19 @@ import com.qianzhui.enode.common.thirdparty.guice.GuiceObjectContainer;
 import com.qianzhui.enode.common.thirdparty.log4j.Log4jLoggerFactory;
 import com.qianzhui.enode.configurations.ConfigurationSetting;
 import com.qianzhui.enode.configurations.OptionSetting;
-import com.qianzhui.enode.configurations.StringKeyValuePair;
 import com.qianzhui.enode.domain.*;
 import com.qianzhui.enode.domain.impl.*;
 import com.qianzhui.enode.eventing.*;
 import com.qianzhui.enode.eventing.impl.*;
 import com.qianzhui.enode.infrastructure.*;
 import com.qianzhui.enode.infrastructure.impl.*;
-import com.qianzhui.enode.infrastructure.impl.inmemory.InMemoryMessageHandleRecordStore;
 import com.qianzhui.enode.infrastructure.impl.inmemory.InMemoryPublishedVersionStore;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlLockService;
-import com.qianzhui.enode.infrastructure.impl.mysql.MysqlMessageHandleRecordStore;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlPublishedVersionStore;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQConsumer;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessageConsumer;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessagePublisher;
-
 import com.qianzhui.enode.rocketmq.client.Consumer;
 import com.qianzhui.enode.rocketmq.client.Producer;
 import com.qianzhui.enode.rocketmq.client.RocketMQFactory;
@@ -53,7 +49,8 @@ import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
 
 import javax.sql.DataSource;
-
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -125,6 +122,23 @@ public class ENode {
 
     public ConfigurationSetting getSetting() {
         return setting;
+    }
+
+    public ENode registerProperties(Properties properties) {
+        ObjectContainer.registerProperties(properties);
+        return this;
+    }
+
+    public ENode registerProperties(String propertiesResourceFile) {
+        InputStream propertiesResource = this.getClass().getClassLoader().getResourceAsStream(propertiesResourceFile);
+        Properties properties = new Properties();
+        try {
+            properties.load(propertiesResource);
+
+            return registerProperties(properties);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public ENode registerCommonComponents() {
@@ -361,20 +375,20 @@ public class ENode {
     public ENode useONS(Properties producerSetting,
                         Properties consumerSetting,
                         int listenPort,
-                        int registerRocketMQComponentsFlag){
+                        int registerRocketMQComponentsFlag) {
         return useRocketMQ(producerSetting, consumerSetting, registerRocketMQComponentsFlag, listenPort, true);
     }
 
     public ENode useNativeRocketMQ(Properties producerSetting,
                                    Properties consumerSetting,
                                    int listenPort,
-                                   int registerRocketMQComponentsFlag){
+                                   int registerRocketMQComponentsFlag) {
         return useRocketMQ(producerSetting, consumerSetting, registerRocketMQComponentsFlag, listenPort, false);
     }
 
     private ENode useRocketMQ(Properties producerSetting,
-                             Properties consumerSetting,
-                             int registerRocketMQComponentsFlag,
+                              Properties consumerSetting,
+                              int registerRocketMQComponentsFlag,
                               int listenPort,
                               boolean isONS) {
 
@@ -419,9 +433,9 @@ public class ENode {
             //CommandService
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_SERVICE)) {
 //                ObjectContainer.register(CommandResultProcessor.class);
-                ObjectContainer.register(CommandResultProcessor.class, null, ()->{
+                ObjectContainer.register(CommandResultProcessor.class, null, () -> {
                     return new CommandResultProcessor(listenPort);
-                },LifeStyle.Singleton);
+                }, LifeStyle.Singleton);
                 ObjectContainer.register(ICommandService.class, CommandService.class);
             }
 

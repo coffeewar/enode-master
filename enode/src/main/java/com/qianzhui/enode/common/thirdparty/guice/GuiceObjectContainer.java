@@ -2,7 +2,6 @@ package com.qianzhui.enode.common.thirdparty.guice;
 
 import com.google.inject.*;
 import com.google.inject.name.Names;
-import com.google.inject.util.Modules;
 import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.common.container.LifeStyle;
@@ -220,6 +219,16 @@ public class GuiceObjectContainer implements IObjectContainer {
     @Override
     public <TService, TImplementer extends TService> void registerInstance(GenericTypeLiteral<TService> typeLiteral, TImplementer instance) {
         register(GuiceModule.typeLiteralInstanceModule(typeLiteral, instance));
+    }
+
+    @Override
+    public void registerProperties(Properties properties) {
+        for (Enumeration<?> e = properties.propertyNames(); e.hasMoreElements(); ) {
+            String propertyName = (String) e.nextElement();
+            String value = properties.getProperty(propertyName);
+
+            registerInstance(String.class, value, propertyName);
+        }
     }
 
     @Override

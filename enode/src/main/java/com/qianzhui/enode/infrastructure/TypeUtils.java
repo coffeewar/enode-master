@@ -64,6 +64,10 @@ public class TypeUtils {
             }
         }
 
+        if(toResolve.isAssignableFrom((Class)superGenericRawType)){
+            return ParameterizedTypeImpl.make(toResolve, genericSuperclassType.getActualTypeArguments(), null);
+        }
+
         return null;
     }
 }

@@ -13,7 +13,8 @@ import com.qianzhui.enodesamples.notesample.commands.CreateNoteCommand;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
 
-import java.util.*;
+import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Created by junbo_xu on 2016/4/15.

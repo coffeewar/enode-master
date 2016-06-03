@@ -67,7 +67,7 @@ public class MysqlLockService implements ILockService {
 
     public void addLockKey(String lockKey) {
         try {
-            _queryRunner.update("insert into lockkey(name)values(?)",lockKey);
+//            _queryRunner.update("insert into lockkey(name)values(?)",lockKey);
 //            Integer count = _queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE NAME=?", _tableName), new BeanHandler<>(Integer.class), lockKey);
             int count = (int)(long)_queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE NAME=?", _tableName), new ScalarHandler<>(), lockKey);
 
