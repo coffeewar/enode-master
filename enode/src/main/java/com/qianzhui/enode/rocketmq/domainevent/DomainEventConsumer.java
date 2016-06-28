@@ -31,10 +31,12 @@ public class DomainEventConsumer {
     private final IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> _processor;
     private final ILogger _logger;
     private final boolean _sendEventHandledMessage;
+    private final ITopicProvider<IDomainEvent> _eventTopicProvider;
 
     @Inject
     public DomainEventConsumer(RocketMQConsumer rocketMQConsumer, IJsonSerializer jsonSerializer, ITypeNameProvider typeNameProvider,
                                IEventSerializer eventSerializer, IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> processor,
+                               ITopicProvider<IDomainEvent> eventITopicProvider,
                                ILoggerFactory loggerFactory) {
         _consumer = rocketMQConsumer;
         _sendReplyService = new SendReplyService();
@@ -44,6 +46,7 @@ public class DomainEventConsumer {
         _processor = processor;
         _logger = loggerFactory.create(getClass());
         _sendEventHandledMessage = true;
+        _eventTopicProvider = eventITopicProvider;
     }
 
     public DomainEventConsumer(RocketMQConsumer consumer, boolean sendEventHandledMessage) {
@@ -56,20 +59,15 @@ public class DomainEventConsumer {
         });
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(this.getClass());
         _sendEventHandledMessage = sendEventHandledMessage;
+        _eventTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IDomainEvent>>() {
+        });
     }
 
     public DomainEventConsumer start() {
         _consumer.registerMessageHandler(new RocketMQMessageHandler() {
             @Override
-            public boolean isMatched(String messageTags) {
-                if(messageTags != null) {
-                    if(messageTags.equals(DomainEventStreamMessage.DOMAIN_EVENT_TAG))
-                        return true;
-
-                    Class type = _typeNameProvider.getType(messageTags);
-                    return IDomainEvent.class.isAssignableFrom(type);
-                }
-                return false;
+            public boolean isMatched(TopicTagData topicTagData) {
+                return _eventTopicProvider.getAllSubscribeTopics().contains(topicTagData);
             }
 
             @Override

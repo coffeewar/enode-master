@@ -28,6 +28,7 @@ import com.qianzhui.enode.infrastructure.impl.mysql.MysqlLockService;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlPublishedVersionStore;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQConsumer;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessageConsumer;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessagePublisher;
 import com.qianzhui.enode.rocketmq.client.Consumer;
@@ -79,7 +80,10 @@ public class ENode {
     public static final int CONSUMERS = COMMAND_CONSUMER | DOMAIN_EVENT_CONSUMER | APPLICATION_MESSAGE_CONSUMER | EXCEPTION_CONSUMER;
     public static final int ALL_COMPONENTS = PUBLISHERS | CONSUMERS;
 
-    private static final String[] ENODE_PACKAGE_SCAN = new String[]{"com.qianzhui.enode.domain", "com.qianzhui.enode.rocketmq"};
+    private static final String[] ENODE_PACKAGE_SCAN = new String[]{"com.qianzhui.enode.domain",
+            "com.qianzhui.enode.rocketmq",
+            "com.qianzhui.enode.infrastructure.impl" //加载AbstractDenormalizer
+    };
 
     private List<Class<?>> _assemblyInitializerServiceTypes;
     private String[] scanPackages;
@@ -467,7 +471,7 @@ public class ENode {
         //Start MQConsumer and any register consumers(CommandConsumer、DomainEventConsumer、ApplicationMessageConsumer、PublishableExceptionConsumer)
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             //All topic
-            Set<String> topics = new HashSet<>();
+            Set<TopicTagData> topicTagDatas = new HashSet<>();
 
             //CommandConsumer
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_CONSUMER)) {
@@ -477,7 +481,7 @@ public class ENode {
                 //Command topics
                 ITopicProvider<ICommand> commandTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
                 });
-                topics.addAll(commandTopicProvider.getAllTopics());
+                topicTagDatas.addAll(commandTopicProvider.getAllSubscribeTopics());
             }
 
             //DomainEventConsumer
@@ -488,7 +492,7 @@ public class ENode {
                 //Domain event topics
                 ITopicProvider<IDomainEvent> domainEventTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IDomainEvent>>() {
                 });
-                topics.addAll(domainEventTopicProvider.getAllTopics());
+                topicTagDatas.addAll(domainEventTopicProvider.getAllSubscribeTopics());
             }
 
             //ApplicationMessageConsumer
@@ -500,7 +504,7 @@ public class ENode {
                 ITopicProvider<IApplicationMessage> applicationMessageTopicProvider = ObjectContainer.tryResolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
                 });
                 if (applicationMessageTopicProvider != null) {
-                    topics.addAll(applicationMessageTopicProvider.getAllTopics());
+                    topicTagDatas.addAll(applicationMessageTopicProvider.getAllSubscribeTopics());
                 }
             }
 
@@ -513,12 +517,17 @@ public class ENode {
                 ITopicProvider<IPublishableException> exceptionTopicProvider = ObjectContainer.tryResolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
                 });
                 if (exceptionTopicProvider != null) {
-                    topics.addAll(exceptionTopicProvider.getAllTopics());
+                    topicTagDatas.addAll(exceptionTopicProvider.getAllSubscribeTopics());
                 }
             }
 
             RocketMQConsumer rocketMQConsumer = ObjectContainer.resolve(RocketMQConsumer.class);
-            topics.stream().forEach(topic -> rocketMQConsumer.subscribe(topic, "*"));
+            //topicTagDatas.stream().forEach(topicTagData -> rocketMQConsumer.subscribe(topicTagData.getTopic(), topicTagData.getTag()));
+
+            topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic,tags)->{
+                String tagsJoin = tags.stream().map(TopicTagData::getTag).collect(Collectors.joining("||"));
+                rocketMQConsumer.subscribe(topic, tagsJoin);
+            });
 
             rocketMQConsumer.start();
         }
@@ -555,6 +564,7 @@ public class ENode {
         FilterBuilder fb = new FilterBuilder();
         fb.include(FilterBuilder.prefix("com.qianzhui.enode.domain.AggregateRoot"));
         fb.include(FilterBuilder.prefix("com.qianzhui.enode.rocketmq.AbstractTopicProvider"));
+        fb.include(FilterBuilder.prefix("com.qianzhui.enode.infrastructure.impl.AbstractDenormalizer"));
 
         Arrays.asList(scanPackages).stream().forEach(pkg -> fb.include(FilterBuilder.prefix(pkg)));
 
@@ -565,6 +575,7 @@ public class ENode {
                         .setScanners(new SubTypesScanner(false), new TypeAnnotationsScanner()));
 
         assemblyTypes = reflections.getSubTypesOf(Object.class);
+        assemblyTypes.stream().map(x->x.getName()).forEach(System.out::println);
 //        assemblyTypes = reflections.getTypesAnnotatedWith(Component.class);
 
         return this;

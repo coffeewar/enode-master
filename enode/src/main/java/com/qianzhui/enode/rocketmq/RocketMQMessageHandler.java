@@ -8,7 +8,7 @@ import com.alibaba.rocketmq.common.message.MessageExt;
  * Created by junbo_xu on 2016/4/15.
  */
 public interface RocketMQMessageHandler {
-    boolean isMatched(String messageTags);
+    boolean isMatched(TopicTagData topicTagData);
 
     ConsumeConcurrentlyStatus handle(MessageExt message, ConsumeConcurrentlyContext context);
 }

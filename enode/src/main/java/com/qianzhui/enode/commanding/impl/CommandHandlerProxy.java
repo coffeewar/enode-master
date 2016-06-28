@@ -25,8 +25,10 @@ public class CommandHandlerProxy implements ICommandHandlerProxy {
     public void handle(ICommandContext context, ICommand command) {
         try {
             _methodHandle.invoke(_commandHandler, context, command);
+        } catch (Exception e) {
+            throw new WrappedRuntimeException(e);
         } catch (Throwable throwable) {
-            throw new WrappedRuntimeException(throwable);
+            throw new WrappedRuntimeException(new RuntimeException(throwable));
         }
     }
 

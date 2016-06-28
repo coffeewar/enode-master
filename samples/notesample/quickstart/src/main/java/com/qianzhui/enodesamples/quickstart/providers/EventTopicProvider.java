@@ -2,6 +2,7 @@ package com.qianzhui.enodesamples.quickstart.providers;
 
 import com.qianzhui.enode.eventing.IDomainEvent;
 import com.qianzhui.enode.rocketmq.AbstractTopicProvider;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,14 +12,14 @@ import java.util.Collection;
  */
 public class EventTopicProvider extends AbstractTopicProvider<IDomainEvent> {
     @Override
-    public String getTopic(IDomainEvent command) {
-        return "NoteSampleTopic";
+    public TopicTagData getPublishTopic(IDomainEvent event) {
+        return new TopicTagData("NoteSampleTopic", "DomainEvent");
     }
 
     @Override
-    public Collection<String> getAllTopics() {
-        return new ArrayList<String>() {{
-            add("NoteSampleTopic");
+    public Collection<TopicTagData> getAllSubscribeTopics() {
+        return new ArrayList<TopicTagData>() {{
+            add(new TopicTagData("NoteSampleTopic", "DomainEvent"));
         }};
     }
 }

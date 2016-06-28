@@ -63,7 +63,9 @@ public class Main {
             enode.useONS(producerSetting,consumerSetting,6000,ENode.COMMAND_SERVICE
                     | ENode.DOMAIN_EVENT_PUBLISHER
                     | ENode.DOMAIN_EVENT_CONSUMER
-                    | ENode.COMMAND_CONSUMER);
+                    | ENode.COMMAND_CONSUMER
+                    | ENode.EXCEPTION_PUBLISHER
+                    | ENode.EXCEPTION_CONSUMER);
         } else {
             enode.useNativeRocketMQ(producerSetting,consumerSetting,6000,ENode.COMMAND_SERVICE
                     | ENode.DOMAIN_EVENT_PUBLISHER

@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  */
 public class DomainEventStreamMessage extends SequenceMessage<String> {
 
-    public static final String DOMAIN_EVENT_TAG = "DomainEventStream";
+//    public static final String DOMAIN_EVENT_TAG = "DomainEventStream";
 
     private String commandId;
     private Map<String, String> items;
@@ -65,11 +65,11 @@ public class DomainEventStreamMessage extends SequenceMessage<String> {
         this.events = events;
     }
 
-    public String getTag() {
+    /*public String getTag() {
         if (events.size() == 1) {
             return events.get(0).getClass().getName();
         } else {
             return DOMAIN_EVENT_TAG;
         }
-    }
+    }*/
 }

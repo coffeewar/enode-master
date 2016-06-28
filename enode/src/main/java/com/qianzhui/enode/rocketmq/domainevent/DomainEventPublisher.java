@@ -16,6 +16,7 @@ import com.qianzhui.enode.infrastructure.IMessagePublisher;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
 
 import javax.inject.Inject;
@@ -63,14 +64,17 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
     private Message createRocketMQMessage(DomainEventStreamMessage eventStream) {
         Ensure.notNull(eventStream.aggregateRootId(), "aggregateRootId");
         EventStreamMessage eventMessage = createEventMessage(eventStream);
-        String topic = _eventTopicProvider.getTopic(eventStream.getEvents().get(0));
+        TopicTagData topicTagData = _eventTopicProvider.getPublishTopic(null);
         String data = _jsonSerializer.serialize(eventMessage);
 
         byte[] body = BitConverter.getBytes(data);
 
         //TODO eventstream tags
         //TODO rocketmq message key of eventstream,default:eventStream.id()
-        return new Message(topic, eventStream.getTag(), eventStream.id(),
+        return new Message(topicTagData.getTopic(),
+//                eventStream.getTag(),
+                topicTagData.getTag(),
+                eventStream.id(),
                 RocketMQMessageTypeCode.DomainEventStreamMessage.getValue(), body, true);
     }
 

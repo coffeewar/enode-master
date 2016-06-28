@@ -12,6 +12,7 @@ import com.qianzhui.enode.infrastructure.*;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
 
 import javax.inject.Inject;
@@ -59,22 +60,27 @@ public class PublishableExceptionPublisher implements IMessagePublisher<IPublish
     }
 
     private Message createEQueueMessage(IPublishableException exception) {
-        String topic = _exceptionTopicProvider.getTopic(exception);
+        TopicTagData topicTagData = _exceptionTopicProvider.getPublishTopic(exception);
         Map<String, String> serializableInfo = new HashMap<>();
         exception.serializeTo(serializableInfo);
-        ISequenceMessage sequenceMessage = (ISequenceMessage) exception;
+        ISequenceMessage sequenceMessage = null;
+        if(exception instanceof ISequenceMessage){
+            sequenceMessage = (ISequenceMessage) exception;
+        }
 
         PublishableExceptionMessage publishableExceptionMessage = new PublishableExceptionMessage();
         publishableExceptionMessage.setUniqueId(exception.id());
         publishableExceptionMessage.setAggregateRootTypeName(sequenceMessage != null ? sequenceMessage.aggregateRootTypeName() : null);
         publishableExceptionMessage.setAggregateRootId(sequenceMessage != null ? sequenceMessage.aggregateRootStringId() : null);
+        publishableExceptionMessage.setExceptionType(exception.getClass().getName());
         publishableExceptionMessage.setTimestamp(exception.timestamp());
         publishableExceptionMessage.setSerializableInfo(serializableInfo);
 
         String data = _jsonSerializer.serialize(publishableExceptionMessage);
 
-        return new Message(topic, //topic
-                _typeNameProvider.getTypeName(exception.getClass()), //tags
+        return new Message(topicTagData.getTopic(), //topic
+//                _typeNameProvider.getTypeName(exception.getClass()), //tags
+                topicTagData.getTag(), //tag
                 exception.id(), // keys
                 RocketMQMessageTypeCode.ExceptionMessage.getValue(), // flag
                 BitConverter.getBytes(data), // body

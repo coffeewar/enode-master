@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 public class RocketMQConsumer {
     private Consumer _consumer;
     private Set<RocketMQMessageHandler> _handlers;
-    private Map<String, RocketMQMessageHandler> _handlerDict;
+    private Map<TopicTagData, RocketMQMessageHandler> _handlerDict;
     private ILogger _logger;
 
     @Inject
@@ -50,19 +50,21 @@ public class RocketMQConsumer {
                                                final ConsumeConcurrentlyContext context) {
 
         MessageExt msg = msgs.get(0);
-        String tags = msg.getTags();
+        String topic = msg.getTopic();
+        String tag = msg.getTags();
+        TopicTagData topicTagData = new TopicTagData(topic, tag);
 
-        RocketMQMessageHandler rocketMQMessageHandler = _handlerDict.get(tags);
+        RocketMQMessageHandler rocketMQMessageHandler = _handlerDict.get(topicTagData);
 
         if (rocketMQMessageHandler == null) {
-            List<RocketMQMessageHandler> handlers = _handlers.stream().filter(handler -> handler.isMatched(tags)).collect(Collectors.toList());
+            List<RocketMQMessageHandler> handlers = _handlers.stream().filter(handler -> handler.isMatched(topicTagData)).collect(Collectors.toList());
             if (handlers.size() > 1) {
                 _logger.error("Duplicate consume handler with {topic:%s,tags:%s}", msg.getTopic(), msg.getTags());
                 return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             }
 
             rocketMQMessageHandler = handlers.get(0);
-            _handlerDict.put(tags, rocketMQMessageHandler);
+            _handlerDict.put(topicTagData, rocketMQMessageHandler);
         }
 
         if (rocketMQMessageHandler == null) {

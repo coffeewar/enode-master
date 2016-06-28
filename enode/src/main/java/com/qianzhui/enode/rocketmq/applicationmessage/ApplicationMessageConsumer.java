@@ -13,9 +13,7 @@ import com.qianzhui.enode.infrastructure.IApplicationMessage;
 import com.qianzhui.enode.infrastructure.IMessageProcessor;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.infrastructure.ProcessingApplicationMessage;
-import com.qianzhui.enode.rocketmq.RocketMQConsumer;
-import com.qianzhui.enode.rocketmq.RocketMQMessageHandler;
-import com.qianzhui.enode.rocketmq.RocketMQProcessContext;
+import com.qianzhui.enode.rocketmq.*;
 
 import javax.inject.Inject;
 
@@ -26,16 +24,19 @@ public class ApplicationMessageConsumer {
 
     private final RocketMQConsumer _consumer;
     private final IJsonSerializer _jsonSerializer;
+    private final ITopicProvider<IApplicationMessage> _messageTopicProvider;
     private final ITypeNameProvider _typeNameProvider;
     private final IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean> _processor;
     private final ILogger _logger;
 
     @Inject
-    public ApplicationMessageConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer, ITypeNameProvider typeNameProvider,
+    public ApplicationMessageConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer,
+                                      ITopicProvider<IApplicationMessage> messageITopicProvider, ITypeNameProvider typeNameProvider,
                                       IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean> processor,
                                       ILoggerFactory loggerFactory) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
+        _messageTopicProvider=messageITopicProvider;
         _typeNameProvider = typeNameProvider;
         _processor = processor;
         _logger = loggerFactory.create(getClass());
@@ -44,6 +45,8 @@ public class ApplicationMessageConsumer {
     public ApplicationMessageConsumer(RocketMQConsumer consumer) {
         _consumer = consumer;
         _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
+        _messageTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
+        });
         _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
         });
         _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
@@ -53,13 +56,8 @@ public class ApplicationMessageConsumer {
     public ApplicationMessageConsumer start() {
         _consumer.registerMessageHandler(new RocketMQMessageHandler() {
             @Override
-            public boolean isMatched(String messageTags) {
-                try {
-                    Class type = _typeNameProvider.getType(messageTags);
-                    return IApplicationMessage.class.isAssignableFrom(type);
-                } catch (Exception e) {
-                    return false;
-                }
+            public boolean isMatched(TopicTagData topicTagData) {
+                return _messageTopicProvider.getAllSubscribeTopics().contains(topicTagData);
             }
 
             @Override
@@ -75,8 +73,10 @@ public class ApplicationMessageConsumer {
     }
 
     ConsumeConcurrentlyStatus handle(final MessageExt msg, final ConsumeConcurrentlyContext context) {
-        Class applicationMessageType = _typeNameProvider.getType(msg.getTags());
-        IApplicationMessage message = (IApplicationMessage) _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), applicationMessageType);
+        ApplicationDataMessage appDataMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), ApplicationDataMessage.class);
+        Class applicationMessageType = _typeNameProvider.getType(appDataMessage.getApplicationMessageType());
+
+        IApplicationMessage message = (IApplicationMessage) _jsonSerializer.deserialize(appDataMessage.getApplicationMessageData(), applicationMessageType);
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingApplicationMessage processingMessage = new ProcessingApplicationMessage(message, processContext);
         _processor.process(processingMessage);

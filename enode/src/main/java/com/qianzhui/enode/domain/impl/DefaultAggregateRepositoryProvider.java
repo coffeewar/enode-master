@@ -38,8 +38,11 @@ public class DefaultAggregateRepositoryProvider implements IAggregateRepositoryP
 
         ParameterizedType superGenericInterfaceType = (ParameterizedType) superGenericInterface;
 
-        AggregateRepositoryProxy<IAggregateRoot> aggregateRepositoryProxy = new AggregateRepositoryProxy<>(ObjectContainer.resolve(new GenericTypeLiteral<IAggregateRepository<IAggregateRoot>>() {
-        }));
+        IAggregateRepository resolve = (IAggregateRepository)ObjectContainer.resolve(aggregateRepositoryType);
+//        AggregateRepositoryProxy<IAggregateRoot> aggregateRepositoryProxy = new AggregateRepositoryProxy<>(ObjectContainer.resolve(new GenericTypeLiteral<IAggregateRepository<IAggregateRoot>>() {
+//        }));
+
+        AggregateRepositoryProxy<IAggregateRoot> aggregateRepositoryProxy = new AggregateRepositoryProxy<>(resolve);
 
         _repositoryDict.put((Class) superGenericInterfaceType.getActualTypeArguments()[0], aggregateRepositoryProxy);
     }

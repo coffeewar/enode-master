@@ -8,16 +8,16 @@ import java.util.Map;
  * Created by junbo_xu on 2016/3/29.
  */
 public abstract class AbstractTopicProvider<T> implements ITopicProvider<T> {
-    private Map<Class, String> _topicDict = new HashMap<>();
+    private Map<Class, TopicTagData> _topicDict = new HashMap<>();
 
     @Override
-    public String getTopic(T source) {
+    public TopicTagData getPublishTopic(T source) {
         return _topicDict.get(source.getClass());
     }
 
 
     @Override
-    public Collection<String> getAllTopics() {
+    public Collection<TopicTagData> getAllSubscribeTopics() {
         return _topicDict.values();
     }
 
@@ -25,7 +25,7 @@ public abstract class AbstractTopicProvider<T> implements ITopicProvider<T> {
         return _topicDict.keySet();
     }
 
-    protected void registerTopic(String topic, Class[] types) {
+    protected void registerTopic(TopicTagData topic, Class[] types) {
         if (types == null || types.length == 0)
             return;
 

@@ -10,9 +10,7 @@ import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.*;
-import com.qianzhui.enode.rocketmq.RocketMQConsumer;
-import com.qianzhui.enode.rocketmq.RocketMQMessageHandler;
-import com.qianzhui.enode.rocketmq.RocketMQProcessContext;
+import com.qianzhui.enode.rocketmq.*;
 
 import javax.inject.Inject;
 
@@ -23,16 +21,19 @@ import javax.inject.Inject;
 public class PublishableExceptionConsumer {
     private final RocketMQConsumer _consumer;
     private final IJsonSerializer _jsonSerializer;
+    private final ITopicProvider<IPublishableException> _exceptionTopicProvider;
     private final ITypeNameProvider _typeNameProvider;
     private final IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean> _publishableExceptionProcessor;
     private final ILogger _logger;
 
     @Inject
-    public PublishableExceptionConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer, ITypeNameProvider typeNameProvider,
+    public PublishableExceptionConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer,
+                                        ITopicProvider<IPublishableException> exceptionITopicProvider, ITypeNameProvider typeNameProvider,
                                         IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean> publishableExceptionProcessor,
                                         ILoggerFactory loggerFactory) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
+        _exceptionTopicProvider = exceptionITopicProvider;
         _typeNameProvider = typeNameProvider;
         _publishableExceptionProcessor = publishableExceptionProcessor;
         _logger = loggerFactory.create(getClass());
@@ -41,6 +42,8 @@ public class PublishableExceptionConsumer {
     public PublishableExceptionConsumer(RocketMQConsumer consumer) {
         _consumer = consumer;
         _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
+        _exceptionTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
+        });
         _publishableExceptionProcessor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
         });
         _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
@@ -50,13 +53,8 @@ public class PublishableExceptionConsumer {
     public PublishableExceptionConsumer start() {
         _consumer.registerMessageHandler(new RocketMQMessageHandler() {
             @Override
-            public boolean isMatched(String messageTags) {
-                try {
-                    Class type = _typeNameProvider.getType(messageTags);
-                    return IPublishableException.class.isAssignableFrom(type);
-                } catch (Exception e) {
-                    return false;
-                }
+            public boolean isMatched(TopicTagData topicTagData) {
+                return _exceptionTopicProvider.getAllSubscribeTopics().contains(topicTagData);
             }
 
             @Override
@@ -73,9 +71,9 @@ public class PublishableExceptionConsumer {
 
     ConsumeConcurrentlyStatus handle(final MessageExt msg, final ConsumeConcurrentlyContext context) {
         PublishableExceptionMessage exceptionMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), PublishableExceptionMessage.class);
-        Class exceptionType = _typeNameProvider.getType(msg.getTags());
+        Class exceptionType = _typeNameProvider.getType(exceptionMessage.getExceptionType());
 
-        IPublishableException exception = null;
+        IPublishableException exception;
 
         try {
             exception = (IPublishableException) exceptionType.getConstructor().newInstance();
@@ -86,9 +84,11 @@ public class PublishableExceptionConsumer {
         exception.setTimestamp(exceptionMessage.getTimestamp());
         exception.restoreFrom(exceptionMessage.getSerializableInfo());
 
-        ISequenceMessage sequenceMessage = (ISequenceMessage) exception;
-        sequenceMessage.setAggregateRootTypeName(exceptionMessage.getAggregateRootTypeName());
-        sequenceMessage.setAggregateRootStringId(exceptionMessage.getAggregateRootId());
+        if(exception instanceof ISequenceMessage) {
+            ISequenceMessage sequenceMessage = (ISequenceMessage) exception;
+            sequenceMessage.setAggregateRootTypeName(exceptionMessage.getAggregateRootTypeName());
+            sequenceMessage.setAggregateRootStringId(exceptionMessage.getAggregateRootId());
+        }
 
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingPublishableExceptionMessage processingMessage = new ProcessingPublishableExceptionMessage(exception, processContext);

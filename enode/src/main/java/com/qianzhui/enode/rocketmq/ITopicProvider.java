@@ -6,7 +6,7 @@ import java.util.Collection;
  * Created by junbo_xu on 2016/3/2.
  */
 public interface ITopicProvider<T> {
-    String getTopic(T source);
+    TopicTagData getPublishTopic(T source);
 
-    Collection<String> getAllTopics();
+    Collection<TopicTagData> getAllSubscribeTopics();
 }

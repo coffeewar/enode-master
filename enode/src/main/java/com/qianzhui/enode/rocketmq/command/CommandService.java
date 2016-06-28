@@ -16,6 +16,7 @@ import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
 
 import javax.inject.Inject;
@@ -124,6 +125,7 @@ public class CommandService implements ICommandService {
                 if (sendResult.getStatus().equals(AsyncTaskStatus.Success)) {
                     //_commandResultProcessor中会继续等命令或事件处理完成的状态
                 } else {
+                    //TODO 是否删除下面一行代码
                     taskCompletionSource.complete(new AsyncTaskResult<>(sendResult.getStatus(), sendResult.getErrorMessage()));
                     _commandResultProcessor.processFailedSendingCommand(command);
                 }
@@ -138,16 +140,19 @@ public class CommandService implements ICommandService {
     private Message buildCommandMessage(ICommand command, boolean needReply) {
         Ensure.notNull(command.getAggregateRootId(), "aggregateRootId");
         String commandData = _jsonSerializer.serialize(command);
-        String topic = _commandTopicProvider.getTopic(command);
+        TopicTagData topicTagData = _commandTopicProvider.getPublishTopic(command);
         String replyAddress = needReply && _commandResultProcessor != null ? parseAddress(_commandResultProcessor.getBindingAddress()) : null;
 //        String replyAddress = null;
-        String messageData = _jsonSerializer.serialize(new CommandMessage(commandData, replyAddress));
+        String messageData = _jsonSerializer.serialize(new CommandMessage(commandData, replyAddress, command.getClass().getName()));
 
         byte[] body = BitConverter.getBytes(messageData);
 
         String key = _commandKeyProvider.getKey(command);
 
-        return new Message(topic, _typeNameProvider.getTypeName(command.getClass()), key,
+        return new Message(topicTagData.getTopic(),
+//                _typeNameProvider.getTypeName(command.getClass()),
+                topicTagData.getTag(),
+                key,
                 RocketMQMessageTypeCode.CommandMessage.ordinal(), body, true);
     }
 

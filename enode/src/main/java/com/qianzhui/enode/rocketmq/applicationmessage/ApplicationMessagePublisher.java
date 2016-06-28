@@ -14,6 +14,7 @@ import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
+import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
 
 import javax.inject.Inject;
@@ -60,11 +61,15 @@ public class ApplicationMessagePublisher implements IMessagePublisher<IApplicati
     }
 
     private Message createEQueueMessage(IApplicationMessage message) {
-        String topic = _messageTopicProvider.getTopic(message);
-        String data = _jsonSerializer.serialize(message);
+        TopicTagData topicTagData = _messageTopicProvider.getPublishTopic(message);
+        String appMessageData = _jsonSerializer.serialize(message);
+        ApplicationDataMessage appDataMessage = new ApplicationDataMessage(appMessageData, message.getClass().getName());
 
-        return new Message(topic, //topic
-                _typeNameProvider.getTypeName(message.getClass()), //tags
+        String data = _jsonSerializer.serialize(appDataMessage);
+
+        return new Message(topicTagData.getTopic(), //topic
+                //_typeNameProvider.getTypeName(message.getClass()), //tags
+                topicTagData.getTag(), //tag
                 message.id(), // keys
                 RocketMQMessageTypeCode.ApplicationMessage.getValue(), // flag
                 BitConverter.getBytes(data), // body

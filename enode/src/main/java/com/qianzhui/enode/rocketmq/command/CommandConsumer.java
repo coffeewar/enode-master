@@ -4,6 +4,7 @@ import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.commanding.*;
+import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
@@ -12,11 +13,9 @@ import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.domain.IAggregateRoot;
 import com.qianzhui.enode.domain.IAggregateStorage;
 import com.qianzhui.enode.domain.IRepository;
+import com.qianzhui.enode.infrastructure.IApplicationMessage;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
-import com.qianzhui.enode.rocketmq.CommandReplyType;
-import com.qianzhui.enode.rocketmq.RocketMQConsumer;
-import com.qianzhui.enode.rocketmq.RocketMQMessageHandler;
-import com.qianzhui.enode.rocketmq.SendReplyService;
+import com.qianzhui.enode.rocketmq.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +35,7 @@ public class CommandConsumer {
     private final ICommandProcessor _processor;
     private final IRepository _repository;
     private final IAggregateStorage _aggregateRootStorage;
+    private final ITopicProvider<ICommand> _commandTopicProvider;
     private final ILogger _logger;
 
     public RocketMQConsumer getConsumer() {
@@ -50,19 +50,16 @@ public class CommandConsumer {
         _processor = ObjectContainer.resolve(ICommandProcessor.class);
         _repository = ObjectContainer.resolve(IRepository.class);
         _aggregateRootStorage = ObjectContainer.resolve(IAggregateStorage.class);
+        _commandTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
+        });
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
     }
 
     public CommandConsumer start() {
         _consumer.registerMessageHandler(new RocketMQMessageHandler() {
             @Override
-            public boolean isMatched(String tags) {
-                try {
-                    Class type = _typeNameProvider.getType(tags);
-                    return ICommand.class.isAssignableFrom(type);
-                } catch (Exception e) {
-                    return false;
-                }
+            public boolean isMatched(TopicTagData topicTagData) {
+                return _commandTopicProvider.getAllSubscribeTopics().contains(topicTagData);
             }
 
             @Override
@@ -85,7 +82,7 @@ public class CommandConsumer {
                                      final ConsumeConcurrentlyContext context) {
         Map<String, String> commandItems = new HashMap<>();
         CommandMessage commandMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), CommandMessage.class);
-        Class commandType = _typeNameProvider.getType(msg.getTags());
+        Class commandType = _typeNameProvider.getType(commandMessage.getCommandType());
         ICommand command = (ICommand) _jsonSerializer.deserialize(commandMessage.getCommandData(), commandType);
         CommandExecuteContext commandExecuteContext = new CommandExecuteContext(_repository, _aggregateRootStorage, msg, /*context, */commandMessage, _sendReplyService);
         commandItems.put("CommandReplyAddress", commandMessage.getReplyAddress());

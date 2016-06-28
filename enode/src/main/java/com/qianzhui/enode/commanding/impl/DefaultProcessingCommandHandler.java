@@ -212,12 +212,17 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                         //到这里，说明当前command执行遇到异常，然后当前command之前也没执行过，是第一次被执行。
                         //那就判断当前异常是否是需要被发布出去的异常，如果是，则发布该异常给所有消费者；否则，就记录错误日志；
                         //然后，认为该command处理失败即可；
-                        IPublishableException publishableException = (IPublishableException) exception;
-                        if (publishableException != null) {
+
+                        Exception exp = exception;
+                        if(exp instanceof WrappedRuntimeException)
+                            exp = ((WrappedRuntimeException)exp).getException();
+
+                        if(exp instanceof IPublishableException) {
+                            IPublishableException publishableException = (IPublishableException) exp;
                             publishExceptionAsync(processingCommand, publishableException, 0);
                         } else {
-                            logCommandExecuteException(processingCommand, commandHandler, exception);
-                            completeCommand(processingCommand, CommandStatus.Failed, exception.getClass().getName(), exception.getMessage());
+                            logCommandExecuteException(processingCommand, commandHandler, exp);
+                            completeCommand(processingCommand, CommandStatus.Failed, exp.getClass().getName(), exp.getMessage());
                         }
                     }
                 },

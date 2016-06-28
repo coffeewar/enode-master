@@ -10,6 +10,7 @@ public class PublishableExceptionMessage {
     private String uniqueId;
     private String aggregateRootId;
     private String aggregateRootTypeName;
+    private String exceptionType;
     private Date timestamp;
     private Map<String, String> serializableInfo;
 
@@ -35,6 +36,14 @@ public class PublishableExceptionMessage {
 
     public void setAggregateRootTypeName(String aggregateRootTypeName) {
         this.aggregateRootTypeName = aggregateRootTypeName;
+    }
+
+    public String getExceptionType() {
+        return exceptionType;
+    }
+
+    public void setExceptionType(String exceptionType) {
+        this.exceptionType = exceptionType;
     }
 
     public Date getTimestamp() {
