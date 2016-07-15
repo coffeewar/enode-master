@@ -1,6 +1,7 @@
 package com.qianzhui.enode.rocketmq.client.impl;
 
 import com.alibaba.rocketmq.client.consumer.DefaultMQPushConsumer;
+import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
 import com.qianzhui.enode.rocketmq.Constants;
 import com.qianzhui.enode.rocketmq.client.AbstractConsumer;
 import com.qianzhui.enode.rocketmq.client.Consumer;
@@ -18,8 +19,9 @@ public class NativeMQConsumer extends AbstractConsumer implements Consumer {
     }
 
     @Override
-    protected DefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer) {
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer();
+    protected CompletableDefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer) {
+//        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer();
+        CompletableDefaultMQPushConsumer consumer = new CompletableDefaultMQPushConsumer();
 
         String consumerGroup = properties.getProperty(NativePropertyKey.ConsumerGroup);
         if (null == consumerGroup) {

@@ -1,7 +1,7 @@
 package com.qianzhui.enode.rocketmq;
 
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import com.alibaba.rocketmq.common.message.MessageExt;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.infrastructure.IMessageProcessContext;
 
 /**
@@ -9,13 +9,14 @@ import com.qianzhui.enode.infrastructure.IMessageProcessContext;
  */
 public class RocketMQProcessContext implements IMessageProcessContext {
     protected final MessageExt _queueMessage;
-    protected final ConsumeConcurrentlyContext _messageContext;
+    protected final CompletableConsumeConcurrentlyContext _messageContext;
 
-    public RocketMQProcessContext(MessageExt queueMessage, ConsumeConcurrentlyContext messageContext) {
+    public RocketMQProcessContext(MessageExt queueMessage, CompletableConsumeConcurrentlyContext messageContext) {
         _queueMessage = queueMessage;
         _messageContext = messageContext;
     }
 
     public void notifyMessageProcessed() {
+        _messageContext.onMessageHandled();
     }
 }

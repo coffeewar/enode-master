@@ -2,6 +2,7 @@ package com.qianzhui.enode.rocketmq.client.ons;
 
 import com.alibaba.rocketmq.client.consumer.DefaultMQPushConsumer;
 import com.alibaba.rocketmq.common.protocol.heartbeat.MessageModel;
+import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
 import com.qianzhui.enode.rocketmq.client.AbstractConsumer;
 import com.qianzhui.enode.rocketmq.client.MQClientInitializer;
 import com.qianzhui.enode.rocketmq.client.Consumer;
@@ -17,8 +18,9 @@ public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
         super(properties, new ONSClientInitializer());
     }
 
-    protected DefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer) {
-        DefaultMQPushConsumer defaultMQPushConsumer = new DefaultMQPushConsumer(new ClientRPCHook(((ONSClientInitializer) mqClientInitializer).sessionCredentials));
+    protected CompletableDefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer) {
+        //DefaultMQPushConsumer defaultMQPushConsumer = new DefaultMQPushConsumer(new ClientRPCHook(((ONSClientInitializer) mqClientInitializer).sessionCredentials));
+        CompletableDefaultMQPushConsumer defaultMQPushConsumer = new CompletableDefaultMQPushConsumer(new ClientRPCHook(((ONSClientInitializer) mqClientInitializer).sessionCredentials));
 
         String consumerGroup = properties.getProperty(PropertyKeyConst.ConsumerId);
         if (null == consumerGroup) {

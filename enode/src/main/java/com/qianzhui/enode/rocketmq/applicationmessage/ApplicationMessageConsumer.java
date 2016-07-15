@@ -7,6 +7,7 @@ import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.IApplicationMessage;
@@ -16,6 +17,7 @@ import com.qianzhui.enode.infrastructure.ProcessingApplicationMessage;
 import com.qianzhui.enode.rocketmq.*;
 
 import javax.inject.Inject;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Created by junbo_xu on 2016/4/6.
@@ -61,8 +63,8 @@ public class ApplicationMessageConsumer {
             }
 
             @Override
-            public ConsumeConcurrentlyStatus handle(MessageExt message, ConsumeConcurrentlyContext context) {
-                return ApplicationMessageConsumer.this.handle(message, context);
+            public void handle(MessageExt message, CompletableConsumeConcurrentlyContext context) {
+                ApplicationMessageConsumer.this.handle(message, context);
             }
         });
         return this;
@@ -72,7 +74,7 @@ public class ApplicationMessageConsumer {
         return this;
     }
 
-    ConsumeConcurrentlyStatus handle(final MessageExt msg, final ConsumeConcurrentlyContext context) {
+    void handle(final MessageExt msg, final CompletableConsumeConcurrentlyContext context) {
         ApplicationDataMessage appDataMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), ApplicationDataMessage.class);
         Class applicationMessageType = _typeNameProvider.getType(appDataMessage.getApplicationMessageType());
 
@@ -80,9 +82,7 @@ public class ApplicationMessageConsumer {
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingApplicationMessage processingMessage = new ProcessingApplicationMessage(message, processContext);
         _processor.process(processingMessage);
-
-        //TODO consume status ack
-        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+//        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
 
     public RocketMQConsumer getConsumer() {

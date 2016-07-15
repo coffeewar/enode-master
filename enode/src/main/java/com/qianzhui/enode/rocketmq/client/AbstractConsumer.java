@@ -1,8 +1,9 @@
 package com.qianzhui.enode.rocketmq.client;
 
-import com.alibaba.rocketmq.client.consumer.DefaultMQPushConsumer;
 import com.alibaba.rocketmq.client.consumer.listener.MessageListenerConcurrently;
 import com.alibaba.rocketmq.client.exception.MQClientException;
+import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableMessageListenerConcurrently;
 
 import java.util.Properties;
 
@@ -11,9 +12,9 @@ import java.util.Properties;
  */
 public abstract class AbstractConsumer {
 
-    private final DefaultMQPushConsumer defaultMQPushConsumer;
+    private final CompletableDefaultMQPushConsumer defaultMQPushConsumer;
 
-    abstract protected DefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer);
+    abstract protected CompletableDefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer);
 
     protected AbstractConsumer(Properties properties, MQClientInitializer mqClientInitializer) {
         mqClientInitializer.init(properties);
@@ -34,6 +35,14 @@ public abstract class AbstractConsumer {
     }
 
     public void registerMessageListener(MessageListenerConcurrently messageListener) {
+        if (null == messageListener) {
+            throw new RocketMQClientException("listener is null");
+        }
+
+        this.defaultMQPushConsumer.registerMessageListener(messageListener);
+    }
+
+    public void registerMessageListener(CompletableMessageListenerConcurrently messageListener) {
         if (null == messageListener) {
             throw new RocketMQClientException("listener is null");
         }

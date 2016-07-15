@@ -1,11 +1,10 @@
 package com.qianzhui.enode.rocketmq;
 
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.rocketmq.client.Consumer;
 
 import javax.inject.Inject;
@@ -46,8 +45,8 @@ public class RocketMQConsumer {
         _consumer.shutdown();
     }
 
-    protected ConsumeConcurrentlyStatus handle(final List<MessageExt> msgs,
-                                               final ConsumeConcurrentlyContext context) {
+    protected void handle(final List<MessageExt> msgs,
+                          final CompletableConsumeConcurrentlyContext context) {
 
         MessageExt msg = msgs.get(0);
         String topic = msg.getTopic();
@@ -60,7 +59,9 @@ public class RocketMQConsumer {
             List<RocketMQMessageHandler> handlers = _handlers.stream().filter(handler -> handler.isMatched(topicTagData)).collect(Collectors.toList());
             if (handlers.size() > 1) {
                 _logger.error("Duplicate consume handler with {topic:%s,tags:%s}", msg.getTopic(), msg.getTags());
-                return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+                context.reconsumeLater();
+//                return CompletableFuture.completedFuture(ConsumeConcurrentlyStatus.RECONSUME_LATER);
+//                return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             }
 
             rocketMQMessageHandler = handlers.get(0);
@@ -69,9 +70,11 @@ public class RocketMQConsumer {
 
         if (rocketMQMessageHandler == null) {
             _logger.error("No consume handler found with {topic:%s,tags:%s}", msg.getTopic(), msg.getTags());
-            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+//            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
+            //return CompletableFuture.completedFuture(ConsumeConcurrentlyStatus.RECONSUME_LATER);
+            context.reconsumeLater();
         } else {
-            return rocketMQMessageHandler.handle(msg, context);
+            rocketMQMessageHandler.handle(msg, context);
         }
     }
 }

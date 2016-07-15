@@ -1,12 +1,11 @@
 package com.qianzhui.enode.rocketmq.publishableexceptions;
 
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.*;
@@ -58,8 +57,8 @@ public class PublishableExceptionConsumer {
             }
 
             @Override
-            public ConsumeConcurrentlyStatus handle(MessageExt message, ConsumeConcurrentlyContext context) {
-                return PublishableExceptionConsumer.this.handle(message, context);
+            public void handle(MessageExt message, CompletableConsumeConcurrentlyContext context) {
+                PublishableExceptionConsumer.this.handle(message, context);
             }
         });
         return this;
@@ -69,7 +68,7 @@ public class PublishableExceptionConsumer {
         return this;
     }
 
-    ConsumeConcurrentlyStatus handle(final MessageExt msg, final ConsumeConcurrentlyContext context) {
+    void handle(final MessageExt msg, final CompletableConsumeConcurrentlyContext context) {
         PublishableExceptionMessage exceptionMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), PublishableExceptionMessage.class);
         Class exceptionType = _typeNameProvider.getType(exceptionMessage.getExceptionType());
 
@@ -84,7 +83,7 @@ public class PublishableExceptionConsumer {
         exception.setTimestamp(exceptionMessage.getTimestamp());
         exception.restoreFrom(exceptionMessage.getSerializableInfo());
 
-        if(exception instanceof ISequenceMessage) {
+        if (exception instanceof ISequenceMessage) {
             ISequenceMessage sequenceMessage = (ISequenceMessage) exception;
             sequenceMessage.setAggregateRootTypeName(exceptionMessage.getAggregateRootTypeName());
             sequenceMessage.setAggregateRootStringId(exceptionMessage.getAggregateRootId());
@@ -93,9 +92,6 @@ public class PublishableExceptionConsumer {
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingPublishableExceptionMessage processingMessage = new ProcessingPublishableExceptionMessage(exception, processContext);
         _publishableExceptionProcessor.process(processingMessage);
-
-        //TODO consume status ack
-        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
 
     public RocketMQConsumer getConsumer() {

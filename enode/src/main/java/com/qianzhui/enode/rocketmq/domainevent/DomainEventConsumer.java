@@ -1,12 +1,11 @@
 package com.qianzhui.enode.rocketmq.domainevent;
 
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.eventing.DomainEventStreamMessage;
@@ -71,8 +70,8 @@ public class DomainEventConsumer {
             }
 
             @Override
-            public ConsumeConcurrentlyStatus handle(MessageExt message, ConsumeConcurrentlyContext context) {
-                return DomainEventConsumer.this.handle(message, context);
+            public void handle(MessageExt message, CompletableConsumeConcurrentlyContext context) {
+                DomainEventConsumer.this.handle(message, context);
             }
         });
 
@@ -89,16 +88,14 @@ public class DomainEventConsumer {
         return this;
     }
 
-    ConsumeConcurrentlyStatus handle(final MessageExt msg,
-                                     final ConsumeConcurrentlyContext context) {
+    void handle(final MessageExt msg,
+                final CompletableConsumeConcurrentlyContext context) {
         EventStreamMessage message = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), EventStreamMessage.class);
 
         DomainEventStreamMessage domainEventStreamMessage = convertToDomainEventStream(message);
         DomainEventStreamProcessContext processContext = new DomainEventStreamProcessContext(this, domainEventStreamMessage, msg, context);
         ProcessingDomainEventStreamMessage processingMessage = new ProcessingDomainEventStreamMessage(domainEventStreamMessage, processContext);
         _processor.process(processingMessage);
-
-        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
 
     private DomainEventStreamMessage convertToDomainEventStream(EventStreamMessage message) {
@@ -119,7 +116,8 @@ public class DomainEventConsumer {
         private final DomainEventConsumer _eventConsumer;
         private final DomainEventStreamMessage _domainEventStreamMessage;
 
-        public DomainEventStreamProcessContext(DomainEventConsumer eventConsumer, DomainEventStreamMessage domainEventStreamMessage, MessageExt queueMessage, ConsumeConcurrentlyContext messageContext) {
+        public DomainEventStreamProcessContext(DomainEventConsumer eventConsumer, DomainEventStreamMessage domainEventStreamMessage,
+                                               MessageExt queueMessage, CompletableConsumeConcurrentlyContext messageContext) {
             super(queueMessage, messageContext);
             _eventConsumer = eventConsumer;
             _domainEventStreamMessage = domainEventStreamMessage;

@@ -8,6 +8,7 @@ import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.domain.IAggregateRoot;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -63,8 +65,8 @@ public class CommandConsumer {
             }
 
             @Override
-            public ConsumeConcurrentlyStatus handle(MessageExt message, ConsumeConcurrentlyContext context) {
-                return CommandConsumer.this.handle(message, context);
+            public void handle(MessageExt message, CompletableConsumeConcurrentlyContext context) {
+                CommandConsumer.this.handle(message, context);
             }
         });
 
@@ -78,17 +80,17 @@ public class CommandConsumer {
     }
 
     //TODO consume ack
-    ConsumeConcurrentlyStatus handle(final MessageExt msg,
-                                     final ConsumeConcurrentlyContext context) {
+    void handle(final MessageExt msg,
+                                                        final CompletableConsumeConcurrentlyContext context) {
         Map<String, String> commandItems = new HashMap<>();
         CommandMessage commandMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), CommandMessage.class);
         Class commandType = _typeNameProvider.getType(commandMessage.getCommandType());
         ICommand command = (ICommand) _jsonSerializer.deserialize(commandMessage.getCommandData(), commandType);
-        CommandExecuteContext commandExecuteContext = new CommandExecuteContext(_repository, _aggregateRootStorage, msg, /*context, */commandMessage, _sendReplyService);
+
+        CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = new CompletableFuture<>();
+        CommandExecuteContext commandExecuteContext = new CommandExecuteContext(_repository, _aggregateRootStorage, msg, context, commandMessage, _sendReplyService, consumeResultFuture);
         commandItems.put("CommandReplyAddress", commandMessage.getReplyAddress());
         _processor.process(new ProcessingCommand(command, commandExecuteContext, commandItems));
-
-        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
 
     class CommandExecuteContext implements ICommandExecuteContext {
@@ -98,22 +100,26 @@ public class CommandConsumer {
         private final IAggregateStorage _aggregateRootStorage;
         private final SendReplyService _sendReplyService;
         private final MessageExt _queueMessage;
-        //        private  IMessageContext _messageContext;
+        private CompletableConsumeConcurrentlyContext _messageContext;
+        private CompletableFuture<ConsumeConcurrentlyStatus> _consumeResultFuture;
         private CommandMessage _commandMessage;
 
-        public CommandExecuteContext(IRepository repository, IAggregateStorage aggregateRootStorage, MessageExt queueMessage, /*IMessageContext messageContext,*/ CommandMessage commandMessage, SendReplyService sendReplyService) {
+        public CommandExecuteContext(IRepository repository, IAggregateStorage aggregateRootStorage, MessageExt queueMessage, CompletableConsumeConcurrentlyContext messageContext,
+                                     CommandMessage commandMessage, SendReplyService sendReplyService, CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture) {
             _trackingAggregateRootDict = new ConcurrentHashMap<>();
             _repository = repository;
             _aggregateRootStorage = aggregateRootStorage;
             _sendReplyService = sendReplyService;
             _queueMessage = queueMessage;
             _commandMessage = commandMessage;
-//            _messageContext = messageContext;
+            _messageContext = messageContext;
+            _consumeResultFuture = consumeResultFuture;
         }
 
         @Override
         public void onCommandExecuted(CommandResult commandResult) {
-//        _messageContext.OnMessageHandled(_queueMessage);
+            _messageContext.onMessageHandled();
+            _consumeResultFuture.complete(ConsumeConcurrentlyStatus.CONSUME_SUCCESS);
 
             if (_commandMessage.getReplyAddress() == null) {
                 return;
