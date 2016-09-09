@@ -145,8 +145,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         IAggregateRoot dirtyAggregateRoot = null;
         List<IDomainEvent> changedEvents = null;
 
-        for (int i = 0, len = trackedAggregateRoots.size(); i < len; i++) {
-            IAggregateRoot aggregateRoot = trackedAggregateRoots.get(0);
+        for (IAggregateRoot aggregateRoot : trackedAggregateRoots) {
             List<IDomainEvent> events = aggregateRoot.getChanges();
 
             if (events.size() > 0) {

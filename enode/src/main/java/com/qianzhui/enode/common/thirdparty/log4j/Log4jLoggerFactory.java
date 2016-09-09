@@ -32,6 +32,7 @@ public class Log4jLoggerFactory implements ILoggerFactory {
             }
 
             if(file.exists()){
+                System.out.println("log4j.properties exist !!!!!!!!!!!!!!!!!");
                 PropertyConfigurator.configureAndWatch(file.getAbsolutePath());
                 return;
             }
