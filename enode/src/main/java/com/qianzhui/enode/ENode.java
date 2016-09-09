@@ -575,7 +575,7 @@ public class ENode {
                         .setScanners(new SubTypesScanner(false), new TypeAnnotationsScanner()));
 
         assemblyTypes = reflections.getSubTypesOf(Object.class);
-        assemblyTypes.stream().map(x->x.getName()).forEach(System.out::println);
+//        assemblyTypes.stream().map(x->x.getName()).forEach(System.out::println);
 //        assemblyTypes = reflections.getTypesAnnotatedWith(Component.class);
 
         return this;
