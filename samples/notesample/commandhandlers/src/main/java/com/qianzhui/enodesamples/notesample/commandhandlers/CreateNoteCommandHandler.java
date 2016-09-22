@@ -10,7 +10,6 @@ import com.qianzhui.enodesamples.notesample.domain.Note;
  */
 public class CreateNoteCommandHandler implements ICommandHandler {
     public void handle(ICommandContext context, CreateNoteCommand command) {
-        throw new TestException("fuck");
 //        context.add(new Note(command.getAggregateRootId(), command.getTitle()));
     }
 }
