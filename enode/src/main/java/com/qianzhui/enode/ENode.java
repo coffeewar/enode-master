@@ -565,6 +565,7 @@ public class ENode {
         fb.include(FilterBuilder.prefix("com.qianzhui.enode.domain.AggregateRoot"));
         fb.include(FilterBuilder.prefix("com.qianzhui.enode.rocketmq.AbstractTopicProvider"));
         fb.include(FilterBuilder.prefix("com.qianzhui.enode.infrastructure.impl.AbstractDenormalizer"));
+        fb.include(FilterBuilder.prefix("com.qianzhui.enode.infrastructure.impl.AbstractAsyncDenormalizer"));
 
         Arrays.asList(scanPackages).stream().forEach(pkg -> fb.include(FilterBuilder.prefix(pkg)));
 
