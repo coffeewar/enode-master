@@ -37,7 +37,7 @@ public abstract class AbstractAsyncDenormalizer {
                 if (ex.getErrorCode() == 1062) { //主键冲突，忽略即可；出现这种情况，是因为同一个消息的重复处理
                     return AsyncTaskResult.Success;
                 }
-                throw new IORuntimeException("Insert record failed.", ex);
+                throw new IORuntimeException("Insert record failed." + ex.getMessage(), ex);
             }
         });
     }
@@ -48,7 +48,7 @@ public abstract class AbstractAsyncDenormalizer {
                 this._queryRunner.update(sql, params);
                 return AsyncTaskResult.Success;
             } catch (SQLException ex) {
-                throw new IORuntimeException("Update record failed.", ex);
+                throw new IORuntimeException("Update record failed." + ex.getMessage(), ex);
             }
         });
     }
@@ -145,7 +145,7 @@ public abstract class AbstractAsyncDenormalizer {
                     //ignore
                     return 1;
                 }
-                throw new IORuntimeException("Insert record failed.", ex);
+                throw new IORuntimeException("Insert record failed." + ex.getMessage(), ex);
             }
         }
     }
