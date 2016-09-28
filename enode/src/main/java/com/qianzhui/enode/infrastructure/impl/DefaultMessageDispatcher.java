@@ -176,7 +176,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 errorMessage ->
                         _logger.fatal(String.format("Handle single message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
-                retryTimes);
+                retryTimes, true);
     }
 
     private void handleTwoMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy2 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy2> queueHandler, int retryTimes) {
@@ -201,7 +201,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 errorMessage ->
                         _logger.fatal(String.format("Handle two message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
-                retryTimes);
+                retryTimes, true);
     }
 
     private void handleThreeMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy3 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy3> queueHandler, int retryTimes) {
@@ -226,7 +226,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 },
                 () -> String.format("[messages:%s, handlerType:{1}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerProxy.getInnerObject().getClass().getName()),
                 errorMessage -> _logger.fatal(String.format("Handle three message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes);
+                retryTimes, true);
     }
 
     class RootDisptaching {

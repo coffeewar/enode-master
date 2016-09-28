@@ -12,11 +12,15 @@ public interface ILogger {
 
     void debug(Object message, Exception exception);
 
+    void debug(Object message, Throwable exception);
+
     void info(Object message);
 
     void info(String format, Object... args);
 
     void info(Object message, Exception exception);
+
+    void info(Object message, Throwable exception);
 
     void error(Object message);
 
@@ -24,15 +28,21 @@ public interface ILogger {
 
     void error(Object message, Exception exception);
 
+    void error(Object message, Throwable exception);
+
     void warn(Object message);
 
     void warn(String format, Object... args);
 
     void warn(Object message, Exception exception);
 
+    void warn(Object message, Throwable exception);
+
     void fatal(Object message);
 
     void fatal(String format, Object... args);
 
     void fatal(Object message, Exception exception);
+
+    void fatal(Object message, Throwable exception);
 }

@@ -17,6 +17,11 @@ public class EmptyLogger implements ILogger {
     public void debug(Object message, Exception exception) {
     }
 
+    @Override
+    public void debug(Object message, Throwable exception) {
+
+    }
+
     public void info(Object message) {
     }
 
@@ -24,6 +29,11 @@ public class EmptyLogger implements ILogger {
     }
 
     public void info(Object message, Exception exception) {
+    }
+
+    @Override
+    public void info(Object message, Throwable exception) {
+
     }
 
     public void error(Object message) {
@@ -35,6 +45,11 @@ public class EmptyLogger implements ILogger {
     public void error(Object message, Exception exception) {
     }
 
+    @Override
+    public void error(Object message, Throwable exception) {
+
+    }
+
     public void warn(Object message) {
     }
 
@@ -44,6 +59,11 @@ public class EmptyLogger implements ILogger {
     public void warn(Object message, Exception exception) {
     }
 
+    @Override
+    public void warn(Object message, Throwable exception) {
+
+    }
+
     public void fatal(Object message) {
     }
 
@@ -51,5 +71,10 @@ public class EmptyLogger implements ILogger {
     }
 
     public void fatal(Object message, Exception exception) {
+    }
+
+    @Override
+    public void fatal(Object message, Throwable exception) {
+
     }
 }

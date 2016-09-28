@@ -35,6 +35,11 @@ public class Log4jLogger implements ILogger {
     }
 
     @Override
+    public void debug(Object message, Throwable exception) {
+        log.debug(message, exception);
+    }
+
+    @Override
     public void info(Object message) {
         log.info(message);
     }
@@ -50,6 +55,11 @@ public class Log4jLogger implements ILogger {
     }
 
     @Override
+    public void info(Object message, Throwable exception) {
+        log.info(message, exception);
+    }
+
+    @Override
     public void error(Object message) {
         log.error(message);
     }
@@ -61,6 +71,10 @@ public class Log4jLogger implements ILogger {
 
     @Override
     public void error(Object message, Exception exception) {
+        log.error(message, exception);
+    }
+
+    public void error(Object message, Throwable exception) {
         log.error(message, exception);
     }
 
@@ -80,6 +94,11 @@ public class Log4jLogger implements ILogger {
     }
 
     @Override
+    public void warn(Object message, Throwable exception) {
+        log.warn(message, exception);
+    }
+
+    @Override
     public void fatal(Object message) {
         log.fatal(message);
     }
@@ -91,6 +110,11 @@ public class Log4jLogger implements ILogger {
 
     @Override
     public void fatal(Object message, Exception exception) {
+        log.fatal(message, exception);
+    }
+
+    @Override
+    public void fatal(Object message, Throwable exception) {
         log.fatal(message, exception);
     }
 
