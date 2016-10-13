@@ -108,7 +108,7 @@ public class ProcessingCommandMailbox {
                     _messageHandler.handleAsync(processingMessage);
                 }
             }
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             hasException = true;
 
             if (ex instanceof IOException || ex instanceof IORuntimeException) {

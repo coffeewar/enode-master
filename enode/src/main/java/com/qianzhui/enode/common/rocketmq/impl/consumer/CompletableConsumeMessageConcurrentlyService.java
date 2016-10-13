@@ -139,9 +139,9 @@ public class CompletableConsumeMessageConcurrentlyService implements ConsumeMess
                 return;
             }
 
-            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofSeconds(20));
+//            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofSeconds(20));
 
-            consumeResultFuture.handle((status,e)->{
+            statusFuture.handle((status,e)->{
                 if(e!=null){
                     log.warn("consumeMessage exception: {} Group: {} Msgs: {} MQ: {}",//
                             RemotingHelper.exceptionSimpleDesc(e),//

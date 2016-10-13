@@ -13,6 +13,10 @@ public class WrappedExceptionParser<T extends Throwable> {
         return new WrappedExceptionParser(e instanceof WrappedRuntimeException ? ((WrappedRuntimeException) e).getException() : e);
     }
 
+    public static WrappedExceptionParser<Exception> create(WrappedRuntimeException wrappedExp) {
+        return new WrappedExceptionParser(wrappedExp.getException());
+    }
+
     private T exception;
     private List<Class<? extends Throwable>> expectExceptionTypes;
     private boolean disrupt;
@@ -31,7 +35,7 @@ public class WrappedExceptionParser<T extends Throwable> {
     }
 
     public WrappedExceptionParser<T> elze(Consumer<T> consumer) {
-        if(!this.disrupt){
+        if (!this.disrupt) {
             this.disrupt = true;
             consumer.accept(this.exception);
         }
@@ -47,6 +51,7 @@ public class WrappedExceptionParser<T extends Throwable> {
 
         public WhenImpl(Class<ExpectType> expectExceptionType, WrappedExceptionParser<OrigType> parser) {
             this.expectExceptionType = expectExceptionType;
+            this.parser = parser;
         }
 
         @Override
@@ -65,5 +70,26 @@ public class WrappedExceptionParser<T extends Throwable> {
         public WrappedExceptionParser then(Consumer consumer) {
             return WrappedExceptionParser.this;
         }
+    }
+
+    public static void main(String[] args) {
+        Exception exception = new IllegalArgumentException("test");
+
+
+        WrappedRuntimeException exp = new WrappedRuntimeException(exception);
+
+        WrappedExceptionParser.create(exp)
+                .when(NullPointerException.class).then(System.out::println)
+                .when(RuntimeException.class).then(e -> System.out.println("RuntimeException" + e.getMessage()))
+                .when(IllegalArgumentException.class).then(e->System.out.println("fuck"))
+                .elze(e->{
+                    System.out.println("else");
+                    System.out.println(e.getMessage());
+                });
+                /*.when(IllegalArgumentException.class).then(e -> {
+                    System.out.println("catch you");
+                    System.out.print(e);
+                });*/
+
     }
 }
