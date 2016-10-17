@@ -164,7 +164,7 @@ public abstract class AbstractAsyncDenormalizer {
 
         @Override
         public int update(QueryRunner queryRunner, Connection connection) throws SQLException {
-            queryRunner.batch(sql, params);
+            queryRunner.batch(connection, sql, params);
             return 0;
         }
     }
