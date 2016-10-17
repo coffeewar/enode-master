@@ -70,6 +70,8 @@ public abstract class AbstractAsyncDenormalizer {
                 } catch (SQLException ex) {
                     connection.rollback();
                     throw new IORuntimeException(ex.getMessage(), ex);
+                } finally {
+                    connection.close();
                 }
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
