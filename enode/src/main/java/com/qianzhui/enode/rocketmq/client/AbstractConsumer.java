@@ -4,6 +4,7 @@ import com.alibaba.rocketmq.client.consumer.listener.MessageListenerConcurrently
 import com.alibaba.rocketmq.client.exception.MQClientException;
 import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableMessageListenerConcurrently;
+import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 
 import java.util.Properties;
 
@@ -13,6 +14,8 @@ import java.util.Properties;
 public abstract class AbstractConsumer {
 
     private final CompletableDefaultMQPushConsumer defaultMQPushConsumer;
+
+    protected AsyncDispatcher traceDispatcher=null;
 
     abstract protected CompletableDefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer);
 
@@ -27,6 +30,10 @@ public abstract class AbstractConsumer {
             this.defaultMQPushConsumer.start();
         } catch (Exception e) {
             throw new RocketMQClientException(e.getMessage(), e);
+        }
+
+        if(this.traceDispatcher!=null){
+            this.traceDispatcher.registerShutDownHook();
         }
     }
 

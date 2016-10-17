@@ -12,6 +12,7 @@ import com.alibaba.rocketmq.common.protocol.ResponseCode;
 import com.alibaba.rocketmq.remoting.exception.RemotingConnectException;
 import com.alibaba.rocketmq.remoting.exception.RemotingTimeoutException;
 import com.qianzhui.enode.rocketmq.client.ons.FAQ;
+import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 
 import java.util.Properties;
 
@@ -20,6 +21,8 @@ import java.util.Properties;
  */
 public abstract class AbstractProducer {
     private final DefaultMQProducer defaultMQProducer;
+
+    protected AsyncDispatcher traceDispatcher = null;
 
     abstract protected DefaultMQProducer initProducer(Properties properties, MQClientInitializer mqClientInitializer);
 
@@ -34,6 +37,10 @@ public abstract class AbstractProducer {
             this.defaultMQProducer.start();
         } catch (Exception e) {
             throw new RocketMQClientException(e.getMessage(), e);
+        }
+
+        if(this.traceDispatcher!=null){
+            this.traceDispatcher.registerShutDownHook();
         }
     }
 

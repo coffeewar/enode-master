@@ -13,6 +13,9 @@ public class PropertyKeyConst {
 
     public static final String SendMsgTimeoutMillis = "SendMsgTimeoutMillis";
 
+    // 是否启动vip channel
+    public static final String isVipChannelEnabled = "isVipChannelEnabled";
+
     // 地址服务器
     public static final String ONSAddr = "ONSAddr";
 

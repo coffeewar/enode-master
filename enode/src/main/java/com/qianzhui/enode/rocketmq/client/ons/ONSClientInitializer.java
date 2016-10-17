@@ -54,7 +54,7 @@ public class ONSClientInitializer extends MQClientInitializer {
     public String buildIntanceName() {
         return Integer.toString(UtilAll.getPid())//
                 + "#" + this.nameServerAddr.hashCode() //
-                + "#" + this.sessionCredentials.getAccessKey().hashCode();
+                + "#" + this.sessionCredentials.getAccessKey().hashCode() + "#" + System.nanoTime();
     }
 
     @Override

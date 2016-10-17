@@ -232,7 +232,7 @@ public class CompletableDefaultMQPushConsumerImpl extends DefaultMQPushConsumerI
     @Override
     public void doRebalance() {
         if (this.rebalanceImpl != null) {
-            this.rebalanceImpl.doRebalance();
+            this.rebalanceImpl.doRebalance(this.isConsumeOrderly());
         }
     }
 
@@ -579,7 +579,7 @@ public class CompletableDefaultMQPushConsumerImpl extends DefaultMQPushConsumerI
                             : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());
 
             this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, msg,
-                    this.defaultMQPushConsumer.getConsumerGroup(), delayLevel, 5000);
+                    this.defaultMQPushConsumer.getConsumerGroup(), delayLevel, 5000, this.defaultMQPushConsumer.getMaxReconsumeTimes());
         }
         catch (Exception e) {
             log.error("sendMessageBack Exception, " + this.defaultMQPushConsumer.getConsumerGroup(), e);
@@ -1111,9 +1111,9 @@ public class CompletableDefaultMQPushConsumerImpl extends DefaultMQPushConsumerI
     }
 
 
-    public Set<QueueTimeSpan> queryConsumeTimeSpan(final String topic) throws RemotingException,
+    public List<QueueTimeSpan> queryConsumeTimeSpan(final String topic) throws RemotingException,
             MQClientException, InterruptedException, MQBrokerException {
-        Set<QueueTimeSpan> queueTimeSpan = new HashSet<QueueTimeSpan>();
+        List<QueueTimeSpan> queueTimeSpan = new ArrayList<QueueTimeSpan>();
         TopicRouteData routeData =
                 this.mQClientFactory.getMQClientAPIImpl().getTopicRouteInfoFromNameServer(topic, 3000);
         for (BrokerData brokerData : routeData.getBrokerDatas()) {
