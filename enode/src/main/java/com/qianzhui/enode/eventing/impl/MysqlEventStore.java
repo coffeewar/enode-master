@@ -90,7 +90,7 @@ public class MysqlEventStore implements IEventStore {
     public List<DomainEventStream> queryAggregateEvents(String aggregateRootId, String aggregateRootTypeName, int minVersion, int maxVersion) {
         List<StreamRecord> records = _ioHelper.tryIOFunc(() -> {
                     try {
-                        return _queryRunner.query(String.format("SELECT * FROM `%s` WHERE AggregateRootId = ? AND Version >= ? AND Version <= ?", getTableName(aggregateRootId)),
+                        return _queryRunner.query(String.format("SELECT * FROM `%s` WHERE AggregateRootId = ? AND Version >= ? AND Version <= ? ORDER BY Version", getTableName(aggregateRootId)),
                                 new BeanListHandler<>(StreamRecord.class),
                                 aggregateRootId,
                                 minVersion,
@@ -114,7 +114,7 @@ public class MysqlEventStore implements IEventStore {
         return _ioHelper.tryIOFuncAsync(() ->
                         CompletableFuture.supplyAsync(() -> {
                             try {
-                                String sql = String.format("SELECT * FROM `%s` WHERE AggregateRootId = ? AND Version >= ? AND Version <= ?", getTableName(aggregateRootId));
+                                String sql = String.format("SELECT * FROM `%s` WHERE AggregateRootId = ? AND Version >= ? AND Version <= ? ORDER BY Version", getTableName(aggregateRootId));
                                 List<StreamRecord> result = _queryRunner.query(sql,
                                         new BeanListHandler<>(StreamRecord.class),
                                         aggregateRootId,
