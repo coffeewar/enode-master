@@ -39,7 +39,7 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y, Z>, Y e
     }
 
     public void addWaitingForRetryMessage(X waitingMessage) {
-        if(!(waitingMessage instanceof ISequenceMessage)){
+        if(!(waitingMessage.getMessage() instanceof ISequenceMessage)){
             throw new IllegalArgumentException("sequenceMessage should not be null.");
         }
 
