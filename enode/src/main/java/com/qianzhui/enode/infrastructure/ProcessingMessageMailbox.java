@@ -1,7 +1,5 @@
 package com.qianzhui.enode.infrastructure;
 
-import com.qianzhui.enode.common.utilities.Ensure;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -39,7 +37,7 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y, Z>, Y e
     }
 
     public void addWaitingForRetryMessage(X waitingMessage) {
-        if(!(waitingMessage instanceof ISequenceMessage)){
+        if(!(waitingMessage.getMessage() instanceof ISequenceMessage)){
             throw new IllegalArgumentException("sequenceMessage should not be null.");
         }
 

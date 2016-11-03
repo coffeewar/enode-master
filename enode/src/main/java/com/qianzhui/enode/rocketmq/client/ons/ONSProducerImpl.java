@@ -99,8 +99,8 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
 
         defaultMQProducer.setInstanceName(clientInitializer.buildIntanceName());
         defaultMQProducer.setNamesrvAddr(clientInitializer.getNameServerAddr());
-        // 消息最大大小128K
-        //this.defaultMQProducer.setMaxMessageSize(1024 * 128);
+        // 消息最大大小4M
+        defaultMQProducer.setMaxMessageSize(1024 * 1024 * 4);
 
         return defaultMQProducer;
     }

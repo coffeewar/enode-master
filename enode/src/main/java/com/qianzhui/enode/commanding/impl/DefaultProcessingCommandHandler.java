@@ -206,7 +206,9 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                         //之所以要这样做是因为虽然该command产生的事件已经持久化成功，但并不表示已经内存也更新了或者事件已经发布出去了；
                         //因为有可能事件持久化成功了，但那时正好机器断电了，则更新内存和发布事件都没有做；
                         //_memoryCache.refreshAggregateFromEventStore(existingEventStream.aggregateRootTypeName(), existingEventStream.aggregateRootId());
+                        _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.");
                         _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
+                        processingCommand.getMailbox().tryExecuteNextMessage();
                     } else {
                         //到这里，说明当前command执行遇到异常，然后当前command之前也没执行过，是第一次被执行。
                         //那就判断当前异常是否是需要被发布出去的异常，如果是，则发布该异常给所有消费者；否则，就记录错误日志；

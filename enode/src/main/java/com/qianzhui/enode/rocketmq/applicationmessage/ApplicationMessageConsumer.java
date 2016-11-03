@@ -1,7 +1,5 @@
 package com.qianzhui.enode.rocketmq.applicationmessage;
 
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
-import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
@@ -17,7 +15,6 @@ import com.qianzhui.enode.infrastructure.ProcessingApplicationMessage;
 import com.qianzhui.enode.rocketmq.*;
 
 import javax.inject.Inject;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Created by junbo_xu on 2016/4/6.
@@ -38,7 +35,7 @@ public class ApplicationMessageConsumer {
                                       ILoggerFactory loggerFactory) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
-        _messageTopicProvider=messageITopicProvider;
+        _messageTopicProvider = messageITopicProvider;
         _typeNameProvider = typeNameProvider;
         _processor = processor;
         _logger = loggerFactory.create(getClass());
@@ -76,7 +73,15 @@ public class ApplicationMessageConsumer {
 
     void handle(final MessageExt msg, final CompletableConsumeConcurrentlyContext context) {
         ApplicationDataMessage appDataMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), ApplicationDataMessage.class);
-        Class applicationMessageType = _typeNameProvider.getType(appDataMessage.getApplicationMessageType());
+        Class applicationMessageType;
+
+        try {
+            applicationMessageType = _typeNameProvider.getType(appDataMessage.getApplicationMessageType());
+        } catch (Exception e) {
+            _logger.warn("Consume applicatio message exception:", e);
+            context.onMessageHandled();
+            return;
+        }
 
         IApplicationMessage message = (IApplicationMessage) _jsonSerializer.deserialize(appDataMessage.getApplicationMessageData(), applicationMessageType);
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);

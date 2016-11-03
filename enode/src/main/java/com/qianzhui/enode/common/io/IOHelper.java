@@ -240,7 +240,7 @@ public class IOHelper {
                 }
             }
         } catch (Exception e) {
-            logger.error(String.format("Failed to execute the taskContinueAction, asyncActionName:%s, contextInfo:%d",
+            logger.error(String.format("Failed to execute the taskContinueAction, asyncActionName:%s, contextInfo:%s",
                     context.getAsyncActionName(),
                     getContextInfo(context.getContextInfoFunc())), e);
         }
