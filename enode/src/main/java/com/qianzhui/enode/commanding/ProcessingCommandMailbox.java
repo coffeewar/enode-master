@@ -157,7 +157,8 @@ public class ProcessingCommandMailbox {
     }
 
     private void exitHandlingMessage() {
-        _isHandlingMessage.set(false);
+//        _isHandlingMessage.compareAndSet(true, false);
+        _isHandlingMessage.getAndSet(false);
     }
 
     private boolean hasRemainningMessage() {
@@ -176,7 +177,7 @@ public class ProcessingCommandMailbox {
         _consumingOffset--;
     }
 
-    private void registerForExecution() {
+    public void registerForExecution() {
         _scheduler.scheduleMailbox(this);
     }
 }

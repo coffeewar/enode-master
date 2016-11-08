@@ -35,7 +35,9 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y, Z>, Y e
     }
 
     public void exitHandlingMessage() {
-        _isHandlingMessage.set(false);
+//        _isHandlingMessage.set(false);
+//        _isHandlingMessage.compareAndSet(true, false);
+        _isHandlingMessage.getAndSet(false);
     }
 
     public void addWaitingForRetryMessage(X waitingMessage) {

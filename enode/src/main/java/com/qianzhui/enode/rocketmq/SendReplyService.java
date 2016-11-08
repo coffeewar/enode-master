@@ -43,11 +43,11 @@ public class SendReplyService {
     }
 
     public void start() {
-        _scheduleService.startTask("RemoveNotActiveRemotingClient", this::removeNotActiveRemotingClient, 1000, ScanNotActiveClientInterval);
+        _scheduleService.startTask(String.format("RemoveNotActiveRemotingClient.%d", this.hashCode()), this::removeNotActiveRemotingClient, 1000, ScanNotActiveClientInterval);
     }
 
     public void stop() {
-        _scheduleService.stopTask("RemoveNotActiveRemotingClient");
+        _scheduleService.stopTask(String.format("RemoveNotActiveRemotingClient.%d", this.hashCode()));
         _clientWrapperDict.values().stream().forEach(x->x.getRemotingClient().shutdown());
     }
 
@@ -64,7 +64,7 @@ public class SendReplyService {
                 byte[] body = BitConverter.getBytes(message);
                 RemotingRequest request = new RemotingRequest(context.getReplyType(), body);
 
-                clientWrapper.getRemotingClient().invokeOneway(request);
+                clientWrapper.invokeOneway(request);
             } catch (Exception ex) {
                 _logger.error("Send command reply failed, replyAddress: " + context.getReplyAddress(), ex);
             }
@@ -93,7 +93,7 @@ public class SendReplyService {
         if (replyEndpoint == null) return null;
 
         return _ioHelper.tryIOFunc("CreateReplyRemotingClient", () -> "replyAddress:" + replyAddress, () ->
-                        createReplyRemotingClient(replyEndpoint)
+                        createReplyRemotingClient(replyAddress, replyEndpoint)
                 , 3);
     }
 
@@ -108,8 +108,8 @@ public class SendReplyService {
         }
     }
 
-    private SocketRemotingClientWrapper createReplyRemotingClient(SocketAddress replyEndpoint) {
-        return _clientWrapperDict.computeIfAbsent(replyEndpoint.toString(), key -> {
+    private SocketRemotingClientWrapper createReplyRemotingClient(String replyAddress, SocketAddress replyEndpoint) {
+        return _clientWrapperDict.computeIfAbsent(replyAddress, key -> {
             SocketRemotingClient remotingClient = new SocketRemotingClient(replyEndpoint).start();
             return new SocketRemotingClientWrapper(replyEndpoint, remotingClient, System.currentTimeMillis());
         });
@@ -152,7 +152,7 @@ public class SendReplyService {
         }
 
         public boolean isNotActive(int maxNotActiveSeconds) {
-            return (System.currentTimeMillis() - lastActiveMillTime) >= maxNotActiveSeconds;
+            return (System.currentTimeMillis() - lastActiveMillTime) >= (maxNotActiveSeconds * 1000);
         }
 
         public SocketAddress getReplyEndpoint() {
@@ -177,6 +177,11 @@ public class SendReplyService {
 
         public void setLastActiveMillTime(long lastActiveMillTime) {
             this.lastActiveMillTime = lastActiveMillTime;
+        }
+
+        public void invokeOneway(RemotingRequest request){
+            getRemotingClient().invokeOneway(request);
+            setLastActiveMillTime(System.currentTimeMillis());
         }
     }
 }

@@ -241,20 +241,20 @@ public class SocketRemotingClient {
 
 
     private void startScanTimeoutRequestTask() {
-        _scheduleService.startTask(String.format("%s.ScanTimeoutRequest", SocketRemotingClient.class.getName()), this::scanTimeoutRequest, 1000, 1000);
+        _scheduleService.startTask(String.format("%s.ScanTimeoutRequest.%d", SocketRemotingClient.class.getName(), this.hashCode()), this::scanTimeoutRequest, 1000, 1000);
     }
 
     private void stopScanTimeoutRequestTask() {
-        _scheduleService.stopTask(String.format("%s.ScanTimeoutRequest", this.getClass().getName()));
+        _scheduleService.stopTask(String.format("%s.ScanTimeoutRequest.%d", this.getClass().getName(), this.hashCode()));
     }
 
     private void startReconnectServerTask() {
-        _scheduleService.startTask(String.format("%s.ReconnectServer", this.getClass().getName()), this::reconnectServer, 1000, 1000);
+        _scheduleService.startTask(String.format("%s.ReconnectServer.%d", this.getClass().getName(), this.hashCode()), this::reconnectServer, 1000, 1000);
     }
 
 
     private void stopReconnectServerTask() {
-        _scheduleService.stopTask(String.format("%s.ReconnectServer", this.getClass().getName()));
+        _scheduleService.stopTask(String.format("%s.ReconnectServer.%d", this.getClass().getName(), this.hashCode()));
     }
 
     private void ensureClientStatus() throws RemotingServerUnAvailableException {

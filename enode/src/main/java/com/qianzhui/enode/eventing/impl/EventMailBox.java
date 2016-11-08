@@ -71,7 +71,9 @@ public class EventMailBox {
     }
 
     public void exitHandlingMessage() {
-        _isHandlingMessage.set(false);
+//        _isHandlingMessage.set(false);
+//        _isHandlingMessage.compareAndSet(true, false);
+        _isHandlingMessage.getAndSet(false);
     }
 
     public void registerForExecution(boolean exitFirst) {
