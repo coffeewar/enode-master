@@ -168,8 +168,8 @@ public class DefaultEventService implements IEventService {
         commandMailBox.resetConsumingOffset(consumeOffset);
         eventMailBox.clear();
         eventMailBox.exitHandlingMessage();
-//        commandMailBox.restartHandlingMessage();
-        commandMailBox.registerForExecution();
+        commandMailBox.restartHandlingMessage();
+//        commandMailBox.registerForExecution();
     }
 
     private void tryToRepublishEventAsync(EventCommittingContext context, int retryTimes) {

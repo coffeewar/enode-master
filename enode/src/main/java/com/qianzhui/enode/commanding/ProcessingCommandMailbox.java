@@ -68,7 +68,8 @@ public class ProcessingCommandMailbox {
 
     public void restartHandlingMessage() {
         _stopHandling = 0;
-        tryExecuteNextMessage();
+        //tryExecuteNextMessage();
+        registerForExecution();
     }
 
     public void tryExecuteNextMessage() {
@@ -95,6 +96,10 @@ public class ProcessingCommandMailbox {
 
     public void run() {
         if (_stopHandling == 1) {
+            exitHandlingMessage();
+            if(_stopHandling == 0){
+                registerForExecution();
+            }
             return;
         }
         boolean hasException = false;
@@ -177,7 +182,7 @@ public class ProcessingCommandMailbox {
         _consumingOffset--;
     }
 
-    public void registerForExecution() {
+    private void registerForExecution() {
         _scheduler.scheduleMailbox(this);
     }
 }
