@@ -106,7 +106,7 @@ public class DefaultEventService implements IEventService {
                             handleFirstEventDuplicationAsync(context, 0);
                         } else {
                             _logger.warn("Batch persist event has concurrent version conflict, first eventStream: %s, batchSize: %d", context.getEventStream(), committingContexts.size());
-                            resetCommandMailBoxConsumingOffset(context, context.getProcessingCommand().getSequence());
+                            resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence());
                         }
                     } else if (appendResult == EventAppendResult.DuplicateCommand) {
                         persistEventOneByOne(committingContexts);
@@ -144,11 +144,11 @@ public class DefaultEventService implements IEventService {
                         //如果事件的版本大于1，则认为是更新聚合根时遇到并发冲突了，则需要进行重试；
                         else {
                             _logger.warn("Persist event has concurrent version conflict, eventStream: %s", context.getEventStream());
-                            resetCommandMailBoxConsumingOffset(context, context.getProcessingCommand().getSequence());
+                            resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence());
                         }
                     } else if (result.getData() == EventAppendResult.DuplicateCommand) {
                         _logger.warn("Persist event has duplicate command, eventStream: %s", context.getEventStream());
-                        resetCommandMailBoxConsumingOffset(context, context.getProcessingCommand().getSequence() + 1);
+                        resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
                         tryToRepublishEventAsync(context, 0);
                         context.getEventMailBox().registerForExecution(true);
                     }
@@ -158,18 +158,22 @@ public class DefaultEventService implements IEventService {
                 retryTimes, true);
     }
 
-    private void resetCommandMailBoxConsumingOffset(EventCommittingContext context, long consumeOffset) {
+    private void resetCommandMailBoxConsumingSequence(EventCommittingContext context, long consumingSequence) {
         EventMailBox eventMailBox = context.getEventMailBox();
         ProcessingCommand processingCommand = context.getProcessingCommand();
         ProcessingCommandMailbox commandMailBox = processingCommand.getMailbox();
 
-        commandMailBox.stopHandlingMessage();
-        updateAggregateMemoryCacheToLatestVersion(context.getEventStream());
-        commandMailBox.resetConsumingOffset(consumeOffset);
-        eventMailBox.clear();
-        eventMailBox.exitHandlingMessage();
-        commandMailBox.restartHandlingMessage();
-//        commandMailBox.registerForExecution();
+        commandMailBox.pauseHandlingMessage();
+        try {
+            updateAggregateMemoryCacheToLatestVersion(context.getEventStream());
+            commandMailBox.resetConsumingSequence(consumingSequence);
+            eventMailBox.clear();
+            eventMailBox.exitHandlingMessage();
+        } catch (Exception ex) {
+            _logger.error(String.format("ResetCommandMailBoxConsumingOffset has unknown exception, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId()), ex);
+        } finally {
+            commandMailBox.resumeHandlingMessage();
+        }
     }
 
     private void tryToRepublishEventAsync(EventCommittingContext context, int retryTimes) {
@@ -219,7 +223,7 @@ public class DefaultEventService implements IEventService {
                         //之所以要这样做，是因为虽然该command产生的事件已经持久化成功，但并不表示事件也已经发布出去了；
                         //有可能事件持久化成功了，但那时正好机器断电了，则发布事件都没有做；
                         if (context.getProcessingCommand().getMessage().id().equals(firstEventStream.commandId())) {
-                            resetCommandMailBoxConsumingOffset(context, context.getProcessingCommand().getSequence() + 1);
+                            resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
                             publishDomainEventAsync(context.getProcessingCommand(), firstEventStream);
                         } else {
                             //如果不是同一个command，则认为是两个不同的command重复创建ID相同的聚合根，我们需要记录错误日志，然后通知当前command的处理完成；
@@ -229,7 +233,7 @@ public class DefaultEventService implements IEventService {
                                     firstEventStream.aggregateRootId(),
                                     firstEventStream.aggregateRootTypeName());
                             _logger.error(errorMessage);
-                            resetCommandMailBoxConsumingOffset(context, context.getProcessingCommand().getSequence() + 1);
+                            resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
                             completeCommand(context.getProcessingCommand(), new CommandResult(CommandStatus.Failed, context.getProcessingCommand().getMessage().id(), eventStream.aggregateRootId(), "Duplicate aggregate creation.", String.class.getName()));
                         }
                     } else {
@@ -297,6 +301,5 @@ public class DefaultEventService implements IEventService {
 
     private void completeCommand(ProcessingCommand processingCommand, CommandResult commandResult) {
         processingCommand.getMailbox().completeMessage(processingCommand, commandResult);
-        _logger.info("Complete command, aggregateId: %s", processingCommand.getMessage().getAggregateRootId());
     }
 }

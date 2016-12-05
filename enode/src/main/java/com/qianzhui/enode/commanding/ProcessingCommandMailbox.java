@@ -19,14 +19,14 @@ public class ProcessingCommandMailbox {
     private final Object _lockObj2 = new Object();
     private final String _aggregateRootId;
     private final ConcurrentMap<Long, ProcessingCommand> _messageDict;
-    private final Map<Long, CommandResult> _requestToCompleteOffsetDict;
+    private final Map<Long, CommandResult> _requestToCompleteSequenceDict;
     private final IProcessingCommandScheduler _scheduler;
     private final IProcessingCommandHandler _messageHandler;
-    private long _maxOffset;
-    private long _consumingOffset;
-    private long _consumedOffset;
+    private long _nextSequence;
+    private long _consumingSequence;
+    private long _consumedSequence;
     private AtomicBoolean _isHandlingMessage;
-    private int _stopHandling;
+    private int _isPaused;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
@@ -34,22 +34,24 @@ public class ProcessingCommandMailbox {
 
     public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandScheduler scheduler, IProcessingCommandHandler messageHandler, ILogger logger) {
         _messageDict = new ConcurrentHashMap<>();
-        _requestToCompleteOffsetDict = new HashMap<>();
+        _requestToCompleteSequenceDict = new HashMap<>();
         _aggregateRootId = aggregateRootId;
         _scheduler = scheduler;
         _messageHandler = messageHandler;
         _logger = logger;
-        _consumedOffset = -1;
+        _consumedSequence = -1;
         _isHandlingMessage = new AtomicBoolean(false);
     }
 
     public void enqueueMessage(ProcessingCommand message) {
         //TODO synchronized
         synchronized (_lockObj) {
-            message.setSequence(_maxOffset);
+            message.setSequence(_nextSequence);
             message.setMailbox(this);
-            _messageDict.putIfAbsent(message.getSequence(), message);
-            _maxOffset++;
+            ProcessingCommand processingCommand = _messageDict.putIfAbsent(message.getSequence(), message);
+            if (processingCommand == message) {
+                _nextSequence++;
+            }
         }
         registerForExecution();
     }
@@ -58,16 +60,16 @@ public class ProcessingCommandMailbox {
         return _isHandlingMessage.compareAndSet(false, true);
     }
 
-    public void stopHandlingMessage() {
-        _stopHandling = 1;
+    public void pauseHandlingMessage() {
+        _isPaused = 1;
     }
 
-    public void resetConsumingOffset(long consumingOffset) {
-        _consumingOffset = consumingOffset;
+    public void resetConsumingSequence(long consumingSequence) {
+        _consumingSequence = consumingSequence;
     }
 
-    public void restartHandlingMessage() {
-        _stopHandling = 0;
+    public void resumeHandlingMessage() {
+        _isPaused = 0;
         //tryExecuteNextMessage();
         registerForExecution();
     }
@@ -77,29 +79,34 @@ public class ProcessingCommandMailbox {
         registerForExecution();
     }
 
-    public void completeMessage(ProcessingCommand message, CommandResult commandResult) {
+    public void completeMessage(ProcessingCommand processingCommand, CommandResult commandResult) {
         //TODO synchronized
         synchronized (_lockObj2) {
-            if (message.getSequence() == _consumedOffset + 1) {
-                _messageDict.remove(message.getSequence());
-                _consumedOffset = message.getSequence();
-                completeMessageWithResult(message, commandResult);
-                processRequestToCompleteOffsets();
-            } else if (message.getSequence() > _consumedOffset + 1) {
-                _requestToCompleteOffsetDict.put(message.getSequence(), commandResult);
-            } else if (message.getSequence() < _consumedOffset + 1) {
-                _messageDict.remove(message.getSequence());
-                _requestToCompleteOffsetDict.remove(message.getSequence());
+            try {
+                if (processingCommand.getSequence() == _consumedSequence + 1) {
+                    _messageDict.remove(processingCommand.getSequence());
+                    completeCommandWithResult(processingCommand, commandResult);
+                    _consumedSequence = processNextCompletedCommands(processingCommand.getSequence());
+                } else if (processingCommand.getSequence() > _consumedSequence + 1) {
+                    _requestToCompleteSequenceDict.put(processingCommand.getSequence(), commandResult);
+                } else if (processingCommand.getSequence() < _consumedSequence + 1) {
+                    _messageDict.remove(processingCommand.getSequence());
+                    completeCommandWithResult(processingCommand, commandResult);
+                    _requestToCompleteSequenceDict.remove(processingCommand.getSequence());
+                }
+                if (_logger.isDebugEnabled()) {
+                    _logger.debug("Command mailbox complete command success, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId());
+                }
+            } catch (Exception ex) {
+                _logger.error(String.format("Command mailbox complete command failed, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId()), ex);
+            } finally {
+                registerForExecution();
             }
         }
     }
 
     public void run() {
-        if (_stopHandling == 1) {
-            exitHandlingMessage();
-            if(_stopHandling == 0){
-                registerForExecution();
-            }
+        if (_isPaused == 1) {
             return;
         }
         boolean hasException = false;
@@ -107,7 +114,7 @@ public class ProcessingCommandMailbox {
         try {
             if (hasRemainningMessage()) {
                 processingMessage = getNextMessage();
-                increaseConsumingOffset();
+                increaseConsumingSequence();
 
                 if (processingMessage != null) {
                     _messageHandler.handleAsync(processingMessage);
@@ -118,14 +125,14 @@ public class ProcessingCommandMailbox {
 
             if (ex instanceof IOException || ex instanceof IORuntimeException) {
                 //We need to retry the command.
-                decreaseConsumingOffset();
+                decreaseConsumingSequence();
             }
 
             if (processingMessage != null) {
                 ICommand command = processingMessage.getMessage();
-                _logger.error(String.format("Failed to handle command [id: %s, type: %s]", command.id(), command.getClass().getName()), ex);
+                _logger.error(String.format("Failed to handle command [id: %s, type: %s], aggregateId: %s", command.id(), command.getClass().getName(), _aggregateRootId), ex);
             } else {
-                _logger.error("Failed to run command mailbox.", ex);
+                _logger.error(String.format("Failed to run command mailbox, aggregateId: %s", _aggregateRootId), ex);
             }
         } finally {
             if (hasException || processingMessage == null) {
@@ -137,23 +144,26 @@ public class ProcessingCommandMailbox {
         }
     }
 
-    private void processRequestToCompleteOffsets() {
-        long nextSequence = _consumedOffset + 1;
+    private long processNextCompletedCommands(long baseSequence) {
+        long returnSequence = baseSequence;
+        long nextSequence = baseSequence + 1;
 
-        while (_requestToCompleteOffsetDict.containsKey(nextSequence)) {
+        while (_requestToCompleteSequenceDict.containsKey(nextSequence)) {
             ProcessingCommand processingCommand = _messageDict.remove(nextSequence);
 
             if (processingCommand != null) {
-                completeMessageWithResult(processingCommand, _requestToCompleteOffsetDict.get(nextSequence));
+                completeCommandWithResult(processingCommand, _requestToCompleteSequenceDict.get(nextSequence));
             }
-            _requestToCompleteOffsetDict.remove(nextSequence);
-            _consumedOffset = nextSequence;
+            _requestToCompleteSequenceDict.remove(nextSequence);
+            returnSequence = nextSequence;
 
             nextSequence++;
         }
+
+        return returnSequence;
     }
 
-    private void completeMessageWithResult(ProcessingCommand processingCommand, CommandResult commandResult) {
+    private void completeCommandWithResult(ProcessingCommand processingCommand, CommandResult commandResult) {
         try {
             processingCommand.complete(commandResult);
         } catch (Exception ex) {
@@ -167,19 +177,19 @@ public class ProcessingCommandMailbox {
     }
 
     private boolean hasRemainningMessage() {
-        return _consumingOffset < _maxOffset;
+        return _consumingSequence < _nextSequence;
     }
 
     private ProcessingCommand getNextMessage() {
-        return _messageDict.get(_consumingOffset);
+        return _messageDict.get(_consumingSequence);
     }
 
-    private void increaseConsumingOffset() {
-        _consumingOffset++;
+    private void increaseConsumingSequence() {
+        _consumingSequence++;
     }
 
-    private void decreaseConsumingOffset() {
-        _consumingOffset--;
+    private void decreaseConsumingSequence() {
+        _consumingSequence--;
     }
 
     private void registerForExecution() {
