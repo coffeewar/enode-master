@@ -10,6 +10,6 @@ import com.qianzhui.enodesamples.notesample.domain.Note;
  */
 public class CreateNoteCommandHandler implements ICommandHandler {
     public void handle(ICommandContext context, CreateNoteCommand command) {
-//        context.add(new Note(command.getAggregateRootId(), command.getTitle()));
+        context.add(new Note(command.getAggregateRootId(), command.getTitle()));
     }
 }
