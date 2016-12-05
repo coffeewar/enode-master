@@ -30,11 +30,6 @@ public class DefaultCommandAsyncHandlerProvider extends AbstractHandlerProvider<
     }
 
     @Override
-    protected boolean isHandleMethodMatchKey(Class[] argumentTypes, Class key) {
-        return argumentTypes.length == 1 && argumentTypes[0] == key;
-    }
-
-    @Override
     protected boolean isHandleMethodMatch(Method method) {
         return method.getName().equals("handleAsync")
                 && method.getParameterTypes().length == 1

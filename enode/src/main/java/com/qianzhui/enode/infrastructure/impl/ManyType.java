@@ -1,6 +1,7 @@
 package com.qianzhui.enode.infrastructure.impl;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -12,9 +13,10 @@ public class ManyType {
     private List<Class> _types = new ArrayList<>();
 
     public ManyType(List<Class> types) {
-        if (types.stream().anyMatch(x -> types.stream().anyMatch(y -> x == y))) {
+        if(new HashSet<>(types).size() != types.size()){
             throw new IllegalArgumentException("Invalid ManyType:" + String.join("|", types.stream().map(x -> x.getName()).collect(Collectors.toList())));
         }
+
         _types = types;
     }
 
