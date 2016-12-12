@@ -5,12 +5,15 @@ import com.qianzhui.enode.commanding.*;
 import com.qianzhui.enode.common.io.IOHelper;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.domain.IMemoryCache;
 import com.qianzhui.enode.eventing.*;
 import com.qianzhui.enode.infrastructure.IMessagePublisher;
 
 import javax.inject.Inject;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -21,28 +24,35 @@ import java.util.stream.Collectors;
  */
 public class DefaultEventService implements IEventService {
     private IProcessingCommandHandler _processingCommandHandler;
-    private final ConcurrentMap<String, EventMailBox> _eventMailboxDict;
+    private final ConcurrentMap<String, EventMailBox> _mailboxDict;
+    private final IScheduleService _scheduleService;
     private final IMemoryCache _memoryCache;
     private final IEventStore _eventStore;
     private final IMessagePublisher<DomainEventStreamMessage> _domainEventPublisher;
     private final IOHelper _ioHelper;
     private final ILogger _logger;
     private final int _batchSize;
+    private final int _timeoutSeconds;
+    private final String _taskName;
 
     @Inject
     public DefaultEventService(
+            IScheduleService scheduleService,
             IMemoryCache memoryCache,
             IEventStore eventStore,
             IMessagePublisher<DomainEventStreamMessage> domainEventPublisher,
             IOHelper ioHelper,
             ILoggerFactory loggerFactory) {
-        _eventMailboxDict = new ConcurrentHashMap<>();
+        _mailboxDict = new ConcurrentHashMap<>();
+        _scheduleService = scheduleService;
         _ioHelper = ioHelper;
         _memoryCache = memoryCache;
         _eventStore = eventStore;
         _domainEventPublisher = domainEventPublisher;
         _logger = loggerFactory.create(getClass());
         _batchSize = ENode.getInstance().getSetting().getEventMailBoxPersistenceMaxBatchSize();
+        _timeoutSeconds = ENode.getInstance().getSetting().getAggregateRootMaxInactiveSeconds();
+        _taskName = "CleanInactiveAggregates_" + System.nanoTime() + new Random().nextInt(10000);
     }
 
     @Override
@@ -52,7 +62,7 @@ public class DefaultEventService implements IEventService {
 
     @Override
     public void commitDomainEventAsync(EventCommittingContext context) {
-        EventMailBox eventMailbox = _eventMailboxDict.computeIfAbsent(context.getAggregateRoot().uniqueId(), x ->
+        EventMailBox eventMailbox = _mailboxDict.computeIfAbsent(context.getAggregateRoot().uniqueId(), x ->
                 new EventMailBox(x, _batchSize, committingContexts ->
                 {
                     if (committingContexts == null || committingContexts.size() == 0) {
@@ -78,6 +88,16 @@ public class DefaultEventService implements IEventService {
         DomainEventStreamMessage eventStreamMessage = new DomainEventStreamMessage(processingCommand.getMessage().id(), eventStream.aggregateRootId(),
                 eventStream.version(), eventStream.aggregateRootTypeName(), eventStream.events(), eventStream.items());
         publishDomainEventAsync(processingCommand, eventStreamMessage, 0);
+    }
+
+    @Override
+    public void start() {
+        _scheduleService.startTask(_taskName, this::cleanInactiveMailbox, ENode.getInstance().getSetting().getScanExpiredAggregateIntervalMilliseconds(), ENode.getInstance().getSetting().getScanExpiredAggregateIntervalMilliseconds());
+    }
+
+    @Override
+    public void stop() {
+        _scheduleService.stopTask(_taskName);
     }
 
     private void batchPersistEventAsync(List<EventCommittingContext> committingContexts, int retryTimes) {
@@ -305,5 +325,17 @@ public class DefaultEventService implements IEventService {
 
     private void completeCommand(ProcessingCommand processingCommand, CommandResult commandResult) {
         processingCommand.getMailbox().completeMessage(processingCommand, commandResult);
+    }
+
+    private void cleanInactiveMailbox() {
+        List<Map.Entry<String, EventMailBox>> inactiveList = _mailboxDict.entrySet().stream().filter(entry ->
+                entry.getValue().isInactive(_timeoutSeconds) && entry.getValue().isRunning()
+        ).collect(Collectors.toList());
+
+        inactiveList.stream().forEach(entry -> {
+            if (_mailboxDict.remove(entry.getKey()) != null) {
+                _logger.info("Removed inactive event mailbox, aggregateRootId: %s", entry.getKey());
+            }
+        });
     }
 }

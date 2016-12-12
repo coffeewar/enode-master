@@ -166,7 +166,6 @@ public class ENode {
         ObjectContainer.register(IAggregateRepositoryProvider.class, DefaultAggregateRepositoryProvider.class);
         ObjectContainer.register(IAggregateRootFactory.class, DefaultAggregateRootFactory.class);
         ObjectContainer.register(IMemoryCache.class, DefaultMemoryCache.class);
-        ObjectContainer.register(ICleanAggregateService.class, DefaultCleanAggregateService.class);
         ObjectContainer.register(IAggregateSnapshotter.class, DefaultAggregateSnapshotter.class);
         ObjectContainer.register(IAggregateStorage.class, EventSourcingAggregateStorage.class);
         ObjectContainer.register(IRepository.class, DefaultRepository.class);
@@ -214,15 +213,22 @@ public class ENode {
 
 
         ObjectContainer.register(ICommandProcessor.class, DefaultCommandProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}, DefaultApplicationMessageProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}, DefaultDomainEventProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}, DefaultPublishableExceptionProcessor.class);
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
-        }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, null, LifeStyle.Singleton);*/
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
-        }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, null, LifeStyle.Singleton);*/
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
-        }, null, LifeStyle.Singleton);
+        }, null, LifeStyle.Singleton);*/
 
 
 //        _assemblyInitializerServiceTypes.add(ITypeNameProvider.class);
@@ -595,13 +601,35 @@ public class ENode {
 
     public ENode start() {
         commitRegisters();
+        startENodeComponents();
         initializeBusinessAssemblies();
         startRocketMQComponents();
         System.out.println("ENode started.");
         return this;
     }
 
+    private void startENodeComponents() {
+        ObjectContainer.resolve(IMemoryCache.class).start();
+        ObjectContainer.resolve(ICommandProcessor.class).start();
+        ObjectContainer.resolve(IEventService.class).start();
+
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}).start();
+    }
+
+    private void stopENodeComponents() {
+        ObjectContainer.resolve(IMemoryCache.class).stop();
+        ObjectContainer.resolve(ICommandProcessor.class).stop();
+        ObjectContainer.resolve(IEventService.class).stop();
+
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}).stop();
+    }
+
     public void shutdown() {
+        stopENodeComponents();
         //Shutdown MQConsumer and any register consumers(CommandConsumer、DomainEventConsumer、ApplicationMessageConsumer、PublishableExceptionConsumer)
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             //CommandConsumer

@@ -103,7 +103,7 @@ public class SendReplyService {
     }
 
     private String toReplyAddress(InetSocketAddress replyAddress) {
-        return String.format("%s:%d", replyAddress.getHostName(), replyAddress.getPort());
+        return String.format("%s:%d", replyAddress.getAddress().getHostAddress(), replyAddress.getPort());
     }
 
     private InetSocketAddress tryParseReplyAddress(String replyAddress) {

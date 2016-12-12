@@ -4,6 +4,7 @@ import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.threading.ManualResetEvent;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -31,6 +32,7 @@ public class ProcessingCommandMailbox {
     private AtomicBoolean _isRunning;
     private boolean _isPaused;
     private boolean _isProcessingCommand;
+    private Date _lastActiveTime;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
@@ -47,6 +49,7 @@ public class ProcessingCommandMailbox {
         _logger = logger;
         _consumedSequence = -1;
         _isRunning = new AtomicBoolean(false);
+        _lastActiveTime = new Date();
     }
 
     public void enqueueMessage(ProcessingCommand message) {
@@ -55,14 +58,16 @@ public class ProcessingCommandMailbox {
             message.setSequence(_nextSequence);
             message.setMailbox(this);
             ProcessingCommand processingCommand = _messageDict.putIfAbsent(message.getSequence(), message);
-            if (processingCommand == message) {
+            if (processingCommand == null) {
                 _nextSequence++;
             }
         }
+        _lastActiveTime = new Date();
         tryRun();
     }
 
     public void pause() {
+        _lastActiveTime = new Date();
         _pauseWaitHandle.reset();
         while (_isProcessingCommand) {
             _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: %s", _aggregateRootId);
@@ -72,18 +77,21 @@ public class ProcessingCommandMailbox {
     }
 
     public void resume() {
+        _lastActiveTime = new Date();
         _isPaused = false;
         _pauseWaitHandle.set();
         tryRun();
     }
 
     public void resetConsumingSequence(long consumingSequence) {
+        _lastActiveTime = new Date();
         _consumingSequence = consumingSequence;
     }
 
     public void completeMessage(ProcessingCommand processingCommand, CommandResult commandResult) {
         //TODO synchronized
         synchronized (_lockObj2) {
+            _lastActiveTime = new Date();
             try {
                 if (processingCommand.getSequence() == _consumedSequence + 1) {
                     _messageDict.remove(processingCommand.getSequence());
@@ -103,6 +111,7 @@ public class ProcessingCommandMailbox {
     }
 
     public void run() {
+        _lastActiveTime = new Date();
         while (_isPaused) {
             _logger.info("Command mailbox is pausing and we should wait for a while, aggregateRootId: %s", _aggregateRootId);
             _pauseWaitHandle.waitOne(1000);
@@ -140,6 +149,10 @@ public class ProcessingCommandMailbox {
                 tryRun();
             }
         }
+    }
+
+    public boolean isInactive(int timeoutSeconds) {
+        return (System.currentTimeMillis() - _lastActiveTime.getTime()) >= timeoutSeconds * 1000l;
     }
 
     private ProcessingCommand getProcessingCommand(long sequence) {
@@ -186,5 +199,13 @@ public class ProcessingCommandMailbox {
 
     private void exit() {
         _isRunning.getAndSet(false);
+    }
+
+    public Date getLastActiveTime() {
+        return _lastActiveTime;
+    }
+
+    public boolean isRunning() {
+        return _isRunning.get();
     }
 }

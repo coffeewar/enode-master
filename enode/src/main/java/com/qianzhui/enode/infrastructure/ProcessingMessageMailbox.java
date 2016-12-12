@@ -2,6 +2,7 @@ package com.qianzhui.enode.infrastructure;
 
 import com.qianzhui.enode.common.logging.ILogger;
 
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -19,6 +20,7 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
     private final IProcessingMessageHandler<X, Y> _messageHandler;
     private AtomicBoolean _isRunning = new AtomicBoolean(false);
     private final Object _lockObj = new Object();
+    private Date _lastActiveTime;
 
     public ProcessingMessageMailbox(String routingKey, IProcessingMessageScheduler<X, Y> scheduler, IProcessingMessageHandler<X, Y> messageHandler, ILogger logger) {
         _routingKey = routingKey;
@@ -26,13 +28,13 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
         _scheduler = scheduler;
         _messageHandler = messageHandler;
         _logger = logger;
+        _lastActiveTime = new Date();
     }
 
     public void enqueueMessage(X processingMessage) {
         processingMessage.setMailbox(this);
-
         _messageQueue.add(processingMessage);
-
+        _lastActiveTime = new Date();
         tryRun();
     }
 
@@ -53,11 +55,13 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
 
         _waitingMessageDict.putIfAbsent(sequenceMessage.version(), waitingMessage);
 
+        _lastActiveTime = new Date();
         exit();
         tryRun();
     }
 
     public void completeMessage(X processingMessage) {
+        _lastActiveTime = new Date();
         if (!tryExecuteWaitingMessage(processingMessage)) {
             exit();
             tryRun();
@@ -65,6 +69,7 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
     }
 
     public void run() {
+        _lastActiveTime = new Date();
         X processingMessage = null;
         try {
             processingMessage = _messageQueue.poll();
@@ -87,6 +92,10 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
                 }
             }
         }
+    }
+
+    public boolean isInactive(int timeoutSeconds) {
+        return (System.currentTimeMillis() - _lastActiveTime.getTime()) >= timeoutSeconds * 1000l;
     }
 
     private boolean tryExecuteWaitingMessage(X currentCompletedMessage) {
@@ -122,5 +131,15 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
 //        _isHandlingMessage.set(false);
 //        _isHandlingMessage.compareAndSet(true, false);
         _isRunning.getAndSet(false);
+    }
+
+    public Date getLastActiveTime()
+
+    {
+        return _lastActiveTime;
+    }
+
+    public boolean isRunning() {
+        return _isRunning.get();
     }
 }

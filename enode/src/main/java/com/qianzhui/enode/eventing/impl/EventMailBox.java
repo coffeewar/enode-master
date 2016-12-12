@@ -4,6 +4,7 @@ import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.eventing.EventCommittingContext;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
@@ -21,6 +22,7 @@ public class EventMailBox {
     private final Consumer<List<EventCommittingContext>> _handleMessageAction;
     private AtomicBoolean _isRunning;
     private int _batchSize;
+    private Date _lastActiveTime;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
@@ -33,10 +35,12 @@ public class EventMailBox {
         _handleMessageAction = handleMessageAction;
         _isRunning = new AtomicBoolean(false);
         _logger = logger;
+        _lastActiveTime = new Date();
     }
 
     public void enqueueMessage(EventCommittingContext message) {
         _messageQueue.add(message);
+        _lastActiveTime = new Date();
         tryRun(false);
     }
 
@@ -54,6 +58,7 @@ public class EventMailBox {
     }
 
     public void run() {
+        _lastActiveTime = new Date();
         List<EventCommittingContext> contextList = null;
         try {
             EventCommittingContext context = null;
@@ -101,7 +106,19 @@ public class EventMailBox {
         _messageQueue.clear();
     }
 
+    public boolean isInactive(int timeoutSeconds) {
+        return (System.currentTimeMillis() - _lastActiveTime.getTime()) >= timeoutSeconds * 1000l;
+    }
+
     private boolean tryEnter() {
         return _isRunning.compareAndSet(false, true);
+    }
+
+    public Date getLastActiveTime() {
+        return _lastActiveTime;
+    }
+
+    public boolean isRunning() {
+        return _isRunning.get();
     }
 }
