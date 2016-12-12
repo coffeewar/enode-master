@@ -7,6 +7,7 @@ import java.util.Map;
  * Created by junbo_xu on 2016/4/5.
  */
 public class EventStreamMessage {
+    private String id;
     private String aggregateRootId;
     private String aggregateRootTypeName;
     private int version;
@@ -14,6 +15,14 @@ public class EventStreamMessage {
     private String commandId;
     private Map<String, String> events;
     private Map<String, String> items;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getAggregateRootId() {
         return aggregateRootId;

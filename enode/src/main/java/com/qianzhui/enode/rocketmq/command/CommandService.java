@@ -70,13 +70,13 @@ public class CommandService implements ICommandService {
 
     @Override
     public void send(ICommand command) {
-        _sendMessageService.sendMessage(_producer, buildCommandMessage(command, false), _commandRouteKeyProvider.getRoutingKey(command));
+        _sendMessageService.sendMessage(_producer, buildCommandMessage(command, false), _commandRouteKeyProvider.getRoutingKey(command), command.id(), null);
     }
 
     @Override
     public CompletableFuture<AsyncTaskResult> sendAsync(ICommand command) {
         try {
-            return _sendMessageService.sendMessageAsync(_producer, buildCommandMessage(command, false), _commandRouteKeyProvider.getRoutingKey(command));
+            return _sendMessageService.sendMessageAsync(_producer, buildCommandMessage(command, false), _commandRouteKeyProvider.getRoutingKey(command), command.id(), null);
         } catch (Exception ex) {
             return CompletableFuture.completedFuture(new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage()));
         }
@@ -119,7 +119,7 @@ public class CommandService implements ICommandService {
             CompletableFuture<AsyncTaskResult<CommandResult>> taskCompletionSource = new CompletableFuture<>();
             _commandResultProcessor.registerProcessingCommand(command, commandReturnType, taskCompletionSource);
 
-            CompletableFuture<AsyncTaskResult> sendMessageAsync = _sendMessageService.sendMessageAsync(_producer, buildCommandMessage(command, true), _commandKeyProvider.getKey(command));
+            CompletableFuture<AsyncTaskResult> sendMessageAsync = _sendMessageService.sendMessageAsync(_producer, buildCommandMessage(command, true), _commandKeyProvider.getKey(command), command.id(), null);
 
             sendMessageAsync.thenAccept(sendResult -> {
                 if (sendResult.getStatus().equals(AsyncTaskStatus.Success)) {

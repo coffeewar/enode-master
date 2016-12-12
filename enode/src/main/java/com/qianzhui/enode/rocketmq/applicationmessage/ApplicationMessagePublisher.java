@@ -57,7 +57,7 @@ public class ApplicationMessagePublisher implements IMessagePublisher<IApplicati
 
     public CompletableFuture<AsyncTaskResult> publishAsync(IApplicationMessage message) {
         Message queueMessage = createEQueueMessage(message);
-        return _sendMessageService.sendMessageAsync(_producer, queueMessage, message.getRoutingKey() == null ? message.id() : message.getRoutingKey());
+        return _sendMessageService.sendMessageAsync(_producer, queueMessage, message.getRoutingKey() == null ? message.id() : message.getRoutingKey(), message.id(), null);
     }
 
     private Message createEQueueMessage(IApplicationMessage message) {

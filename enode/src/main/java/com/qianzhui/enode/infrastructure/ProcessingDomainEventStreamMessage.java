@@ -6,8 +6,8 @@ import com.qianzhui.enode.eventing.DomainEventStreamMessage;
 /**
  * Created by junbo_xu on 2016/4/5.
  */
-public class ProcessingDomainEventStreamMessage implements IProcessingMessage<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>, ISequenceProcessingMessage {
-    private ProcessingMessageMailbox<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> _mailbox;
+public class ProcessingDomainEventStreamMessage implements IProcessingMessage<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>, ISequenceProcessingMessage {
+    private ProcessingMessageMailbox<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> _mailbox;
     private IMessageProcessContext _processContext;
 
     public DomainEventStreamMessage message;
@@ -17,7 +17,7 @@ public class ProcessingDomainEventStreamMessage implements IProcessingMessage<Pr
         _processContext = processContext;
     }
 
-    public void setMailbox(ProcessingMessageMailbox<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> mailbox) {
+    public void setMailbox(ProcessingMessageMailbox<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> mailbox) {
         _mailbox = mailbox;
     }
 
@@ -26,7 +26,7 @@ public class ProcessingDomainEventStreamMessage implements IProcessingMessage<Pr
         _mailbox.addWaitingForRetryMessage(this);
     }
 
-    public void setResult(Boolean result) {
+    public void complete() {
         _processContext.notifyMessageProcessed();
         if (_mailbox != null) {
             _mailbox.completeMessage(this);

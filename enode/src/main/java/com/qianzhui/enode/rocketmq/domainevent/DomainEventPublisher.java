@@ -58,7 +58,7 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
 
     public CompletableFuture<AsyncTaskResult> publishAsync(DomainEventStreamMessage eventStream) {
         Message message = createRocketMQMessage(eventStream);
-        return _sendMessageService.sendMessageAsync(_producer, message, eventStream.getRoutingKey() == null ? eventStream.aggregateRootId() : eventStream.getRoutingKey());
+        return _sendMessageService.sendMessageAsync(_producer, message, eventStream.getRoutingKey() == null ? eventStream.aggregateRootId() : eventStream.getRoutingKey(), eventStream.id(), String.valueOf(eventStream.version()));
     }
 
     private Message createRocketMQMessage(DomainEventStreamMessage eventStream) {
@@ -80,6 +80,8 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
 
     private EventStreamMessage createEventMessage(DomainEventStreamMessage eventStream) {
         EventStreamMessage message = new EventStreamMessage();
+
+        message.setId(eventStream.id());
 
         message.setCommandId(eventStream.getCommandId());
         message.setAggregateRootTypeName(eventStream.aggregateRootTypeName());

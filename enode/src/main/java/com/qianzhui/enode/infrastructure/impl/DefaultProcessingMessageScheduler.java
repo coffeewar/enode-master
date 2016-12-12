@@ -8,11 +8,11 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Created by junbo_xu on 2016/3/19.
  */
-public class DefaultProcessingMessageScheduler<X extends IProcessingMessage<X, Y, Z>, Y extends IMessage, Z> implements IProcessingMessageScheduler<X, Y, Z> {
-    private IProcessingMessageHandler<X, Y, Z> _messageHandler;
+public class DefaultProcessingMessageScheduler<X extends IProcessingMessage<X, Y>, Y extends IMessage> implements IProcessingMessageScheduler<X, Y> {
+    private IProcessingMessageHandler<X, Y> _messageHandler;
 
     @Inject
-    public DefaultProcessingMessageScheduler(IProcessingMessageHandler<X, Y, Z> messageHandler) {
+    public DefaultProcessingMessageScheduler(IProcessingMessageHandler<X, Y> messageHandler) {
         _messageHandler = messageHandler;
     }
 
@@ -22,9 +22,7 @@ public class DefaultProcessingMessageScheduler<X extends IProcessingMessage<X, Y
     }
 
     @Override
-    public void scheduleMailbox(ProcessingMessageMailbox<X, Y, Z> mailbox) {
-        if (mailbox.enterHandlingMessage()) {
-            CompletableFuture.runAsync(mailbox::run);
-        }
+    public void scheduleMailbox(ProcessingMessageMailbox<X, Y> mailbox) {
+        CompletableFuture.runAsync(mailbox::run);
     }
 }
