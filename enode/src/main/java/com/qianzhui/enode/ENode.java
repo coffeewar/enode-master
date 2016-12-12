@@ -193,35 +193,35 @@ public class ENode {
         }, DoNothingPublisher.class);
 
         ObjectContainer.register(IProcessingCommandHandler.class, DefaultProcessingCommandHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, DomainEventStreamMessageHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
 
         ObjectContainer.register(ICommandProcessor.class, DefaultCommandProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
 
@@ -523,7 +523,7 @@ public class ENode {
             RocketMQConsumer rocketMQConsumer = ObjectContainer.resolve(RocketMQConsumer.class);
             //topicTagDatas.stream().forEach(topicTagData -> rocketMQConsumer.subscribe(topicTagData.getTopic(), topicTagData.getTag()));
 
-            topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic,tags)->{
+            topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic, tags) -> {
                 String tagsJoin = tags.stream().map(TopicTagData::getTag).collect(Collectors.joining("||"));
                 rocketMQConsumer.subscribe(topic, tagsJoin);
             });
