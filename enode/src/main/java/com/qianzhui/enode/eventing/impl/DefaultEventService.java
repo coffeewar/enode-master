@@ -63,12 +63,11 @@ public class DefaultEventService implements IEventService {
                     } else {
                         persistEventOneByOne(committingContexts);
                     }
-                })
+                }, _logger)
         );
 
         eventMailbox.enqueueMessage(context);
         refreshAggregateMemoryCache(context);
-        context.getProcessingCommand().getMailbox().tryExecuteNextMessage();
     }
 
     @Override
@@ -98,11 +97,10 @@ public class DefaultEventService implements IEventService {
                                 committingContexts.stream().forEach(context -> publishDomainEventAsync(context.getProcessingCommand(), context.getEventStream()))
                         );
 
-                        eventMailBox.registerForExecution(true);
+                        eventMailBox.tryRun(true);
                     } else if (appendResult == EventAppendResult.DuplicateEvent) {
                         EventCommittingContext context = committingContexts.get(0);
                         if (context.getEventStream().version() == 1) {
-                            concatConetxts(committingContexts);
                             handleFirstEventDuplicationAsync(context, 0);
                         } else {
                             _logger.warn("Batch persist event has concurrent version conflict, first eventStream: %s, batchSize: %d", context.getEventStream(), committingContexts.size());
@@ -119,7 +117,7 @@ public class DefaultEventService implements IEventService {
     }
 
     private void persistEventOneByOne(List<EventCommittingContext> contextList) {
-        concatConetxts(contextList);
+        ConcatContexts(contextList);
         persistEventAsync(contextList.get(0), 0);
     }
 
@@ -135,7 +133,11 @@ public class DefaultEventService implements IEventService {
                         }
                         CompletableFuture.runAsync(() -> publishDomainEventAsync(context.getProcessingCommand(), context.getEventStream()));
 
-                        tryProcessNextContext(context);
+                        if (context.getNext() != null) {
+                            persistEventAsync(context.getNext(), 0);
+                        } else {
+                            context.getEventMailBox().tryRun(true);
+                        }
                     } else if (result.getData() == EventAppendResult.DuplicateEvent) {
                         //如果是当前事件的版本号为1，则认为是在创建重复的聚合根
                         if (context.getEventStream().version() == 1) {
@@ -150,7 +152,6 @@ public class DefaultEventService implements IEventService {
                         _logger.warn("Persist event has duplicate command, eventStream: %s", context.getEventStream());
                         resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
                         tryToRepublishEventAsync(context, 0);
-                        context.getEventMailBox().registerForExecution(true);
                     }
                 },
                 () -> String.format("[eventStream:%s]", context.getEventStream()),
@@ -161,18 +162,21 @@ public class DefaultEventService implements IEventService {
     private void resetCommandMailBoxConsumingSequence(EventCommittingContext context, long consumingSequence) {
         EventMailBox eventMailBox = context.getEventMailBox();
         ProcessingCommand processingCommand = context.getProcessingCommand();
+        ICommand command = processingCommand.getMessage();
         ProcessingCommandMailbox commandMailBox = processingCommand.getMailbox();
 
-        commandMailBox.pauseHandlingMessage();
+        commandMailBox.pause();
         try {
-            updateAggregateMemoryCacheToLatestVersion(context.getEventStream());
+            refreshAggregateMemoryCacheToLatestVersion(context.getEventStream().aggregateRootTypeName(), context.getEventStream().aggregateRootId());
             commandMailBox.resetConsumingSequence(consumingSequence);
             eventMailBox.clear();
-            eventMailBox.exitHandlingMessage();
+            eventMailBox.exit();
+            _logger.info("ResetCommandMailBoxConsumingSequence success, commandId: %s, aggregateRootId: %s, consumingSequence: %d", command.id(), command.getAggregateRootId(), consumingSequence);
+
         } catch (Exception ex) {
-            _logger.error(String.format("ResetCommandMailBoxConsumingOffset has unknown exception, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId()), ex);
+            _logger.error(String.format("ResetCommandMailBoxConsumingOffset has unknown exception, commandId: %s, aggregateRootId: %s", command.id(), command.getAggregateRootId()), ex);
         } finally {
-            commandMailBox.resumeHandlingMessage();
+            commandMailBox.resume();
         }
     }
 
@@ -194,11 +198,14 @@ public class DefaultEventService implements IEventService {
                         //到这里，说明当前command想添加到eventStore中时，提示command重复，但是尝试从eventStore中取出该command时却找不到该command。
                         //出现这种情况，我们就无法再做后续处理了，这种错误理论上不会出现，除非eventStore的Add接口和Get接口出现读写不一致的情况；
                         //框架会记录错误日志，让开发者排查具体是什么问题。
-                        String errorMessage = String.format("Command exist in the event store, but we cannot find it from the event store, this should not be happen, and we cannot continue again. commandType:%s, commandId:%s, aggregateRootId:%s",
+                        String errorMessage = String.format("Command should be exist in the event store, but we cannot find it from the event store, this should not be happen, and we cannot continue again. commandType:%s, commandId:%s, aggregateRootId:%s",
                                 command.getClass().getName(),
                                 command.id(),
                                 command.getAggregateRootId());
                         _logger.fatal(errorMessage);
+
+                        CommandResult commandResult = new CommandResult(CommandStatus.Failed, command.id(), command.getAggregateRootId(), "Command should be exist in the event store, but we cannot find it from the event store.", String.class.getName());
+                        completeCommand(context.getProcessingCommand(), commandResult);
                     }
                 },
                 () -> String.format("[aggregateRootId:%s, commandId:%s]", command.getAggregateRootId(), command.id()),
@@ -234,7 +241,8 @@ public class DefaultEventService implements IEventService {
                                     firstEventStream.aggregateRootTypeName());
                             _logger.error(errorMessage);
                             resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
-                            completeCommand(context.getProcessingCommand(), new CommandResult(CommandStatus.Failed, context.getProcessingCommand().getMessage().id(), eventStream.aggregateRootId(), "Duplicate aggregate creation.", String.class.getName()));
+                            CommandResult commandResult = new CommandResult(CommandStatus.Failed, context.getProcessingCommand().getMessage().id(), eventStream.aggregateRootId(), "Duplicate aggregate creation.", String.class.getName());
+                            completeCommand(context.getProcessingCommand(), commandResult);
                         }
                     } else {
                         String errorMessage = String.format("Duplicate aggregate creation, but we cannot find the existing eventstream from eventstore. commandId:%s, aggregateRootId:%s, aggregateRootTypeName:%s",
@@ -242,6 +250,9 @@ public class DefaultEventService implements IEventService {
                                 eventStream.aggregateRootId(),
                                 eventStream.aggregateRootTypeName());
                         _logger.fatal(errorMessage);
+                        resetCommandMailBoxConsumingSequence(context, context.getProcessingCommand().getSequence() + 1);
+                        CommandResult commandResult = new CommandResult(CommandStatus.Failed, context.getProcessingCommand().getMessage().id(), eventStream.aggregateRootId(), "Duplicate aggregate creation, but we cannot find the existing eventstream from eventstore.", String.class.getName());
+                        completeCommand(context.getProcessingCommand(), commandResult);
                     }
                 },
                 () -> String.format("[eventStream:%s]", eventStream),
@@ -254,23 +265,15 @@ public class DefaultEventService implements IEventService {
             context.getAggregateRoot().acceptChanges(context.getEventStream().version());
             _memoryCache.set(context.getAggregateRoot());
         } catch (Exception ex) {
-            _logger.error(String.format("Refresh memory cache failed for event stream:%s", context.getEventStream()), ex);
+            _logger.error(String.format("Refresh aggregate memory cache failed for event stream:%s", context.getEventStream()), ex);
         }
     }
 
-    private void updateAggregateMemoryCacheToLatestVersion(DomainEventStream eventStream) {
+    private void refreshAggregateMemoryCacheToLatestVersion(String aggregateRootTypeName, String aggregateRootId) {
         try {
-            _memoryCache.refreshAggregateFromEventStore(eventStream.aggregateRootTypeName(), eventStream.aggregateRootId());
+            _memoryCache.refreshAggregateFromEventStore(aggregateRootTypeName, aggregateRootId);
         } catch (Exception ex) {
-            _logger.error(String.format("Try to refresh aggregate in-memory from event store failed, eventStream: %s", eventStream), ex);
-        }
-    }
-
-    private void tryProcessNextContext(EventCommittingContext currentContext) {
-        if (currentContext.getNext() != null) {
-            persistEventAsync(currentContext.getNext(), 0);
-        } else {
-            currentContext.getEventMailBox().registerForExecution(true);
+            _logger.error(String.format("Refresh aggregate memory cache to latest version has unknown exception, aggregateRootTypeName: %s, aggregateRootId:%s", aggregateRootTypeName, aggregateRootId), ex);
         }
     }
 
@@ -284,14 +287,15 @@ public class DefaultEventService implements IEventService {
                         _logger.debug("Publish domain events success, %s", eventStream);
                     }
                     String commandHandleResult = processingCommand.getCommandExecuteContext().getResult();
-                    completeCommand(processingCommand, new CommandResult(CommandStatus.Success, processingCommand.getMessage().id(), eventStream.aggregateRootId(), commandHandleResult, String.class.getName()));
+                    CommandResult commandResult = new CommandResult(CommandStatus.Success, processingCommand.getMessage().id(), eventStream.aggregateRootId(), commandHandleResult, String.class.getName());
+                    completeCommand(processingCommand, commandResult);
                 },
                 () -> String.format("[eventStream:%s]", eventStream),
                 errorMessage -> _logger.fatal(String.format("Publish event has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true);
     }
 
-    private void concatConetxts(List<EventCommittingContext> contextList) {
+    private void ConcatContexts(List<EventCommittingContext> contextList) {
         for (int i = 0; i < contextList.size() - 1; i++) {
             EventCommittingContext currentContext = contextList.get(i);
             EventCommittingContext nextContext = contextList.get(i + 1);

@@ -202,7 +202,6 @@ public class ENode {
         }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
         }, null, LifeStyle.Singleton);
 
-        ObjectContainer.register(IProcessingCommandScheduler.class, DefaultProcessingCommandScheduler.class);
         ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
         }, null, LifeStyle.Singleton);

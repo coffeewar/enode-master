@@ -66,7 +66,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     }
 
     @Override
-    public void handleAsync(ProcessingCommand processingCommand) {
+    public void handle(ProcessingCommand processingCommand) {
         ICommand command = processingCommand.getMessage();
 
         if (command.getAggregateRootId() == null || command.getAggregateRootId().trim().equals("")) {
@@ -208,7 +208,6 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                         //_memoryCache.refreshAggregateFromEventStore(existingEventStream.aggregateRootTypeName(), existingEventStream.aggregateRootId());
                         _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.");
                         _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
-                        processingCommand.getMailbox().tryExecuteNextMessage();
                     } else {
                         //到这里，说明当前command执行遇到异常，然后当前command之前也没执行过，是第一次被执行。
                         //那就判断当前异常是否是需要被发布出去的异常，如果是，则发布该异常给所有消费者；否则，就记录错误日志；
@@ -497,7 +496,6 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     private void completeCommand(ProcessingCommand processingCommand, CommandStatus commandStatus, String resultType, String result) {
         CommandResult commandResult = new CommandResult(commandStatus, processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId(), result, resultType);
         processingCommand.getMailbox().completeMessage(processingCommand, commandResult);
-        processingCommand.getMailbox().tryExecuteNextMessage();
     }
 
     enum HandlerFindStatus {

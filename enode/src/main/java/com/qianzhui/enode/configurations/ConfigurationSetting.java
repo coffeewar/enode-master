@@ -22,6 +22,11 @@ public class ConfigurationSetting {
     private int aggregateRootMaxInactiveSeconds;
 
     /**
+     * CommandMailBox中的命令处理时一次最多处理多少个命令，默认为1000个
+     */
+    private int commandMailBoxPersistenceMaxBatchSize;
+
+    /**
      * EventMailBox中的事件持久化时一次最多持久化多少个事件，默认为1000个
      */
     private int eventMailBoxPersistenceMaxBatchSize;
@@ -31,6 +36,7 @@ public class ConfigurationSetting {
         defaultDBConfigurationSetting = new DefaultDBConfigurationSetting();
         scanExpiredAggregateIntervalMilliseconds = 5000;
         aggregateRootMaxInactiveSeconds = 3600 * 24 * 3;
+        commandMailBoxPersistenceMaxBatchSize = 1000;
         eventMailBoxPersistenceMaxBatchSize = 1000;
     }
 
@@ -64,6 +70,14 @@ public class ConfigurationSetting {
 
     public void setDefaultDBConfigurationSetting(DefaultDBConfigurationSetting defaultDBConfigurationSetting) {
         this.defaultDBConfigurationSetting = defaultDBConfigurationSetting;
+    }
+
+    public int getCommandMailBoxPersistenceMaxBatchSize() {
+        return commandMailBoxPersistenceMaxBatchSize;
+    }
+
+    public void setCommandMailBoxPersistenceMaxBatchSize(int commandMailBoxPersistenceMaxBatchSize) {
+        this.commandMailBoxPersistenceMaxBatchSize = commandMailBoxPersistenceMaxBatchSize;
     }
 
     public int getEventMailBoxPersistenceMaxBatchSize() {

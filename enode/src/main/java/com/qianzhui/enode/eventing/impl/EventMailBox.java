@@ -1,5 +1,6 @@
 package com.qianzhui.enode.eventing.impl;
 
+import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.eventing.EventCommittingContext;
 
 import java.util.ArrayList;
@@ -14,31 +15,42 @@ import java.util.function.Consumer;
  * Created by junbo_xu on 2016/4/23.
  */
 public class EventMailBox {
+    private final ILogger _logger;
     private final String _aggregateRootId;
     private final Queue<EventCommittingContext> _messageQueue;
     private final Consumer<List<EventCommittingContext>> _handleMessageAction;
-    private AtomicBoolean _isHandlingMessage;
+    private AtomicBoolean _isRunning;
     private int _batchSize;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
     }
 
-    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction) {
+    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction, ILogger logger) {
         _aggregateRootId = aggregateRootId;
         _messageQueue = new ConcurrentLinkedQueue<>();
         _batchSize = batchSize;
         _handleMessageAction = handleMessageAction;
-        _isHandlingMessage = new AtomicBoolean(false);
+        _isRunning = new AtomicBoolean(false);
+        _logger = logger;
     }
 
     public void enqueueMessage(EventCommittingContext message) {
         _messageQueue.add(message);
-        registerForExecution(false);
+        tryRun(false);
     }
 
-    public void clear() {
-        _messageQueue.clear();
+    public void tryRun() {
+        tryRun(false);
+    }
+
+    public void tryRun(boolean exitFirst) {
+        if (exitFirst) {
+            exit();
+        }
+        if (tryEnter()) {
+            CompletableFuture.runAsync(this::run);
+        }
     }
 
     public void run() {
@@ -60,32 +72,36 @@ public class EventMailBox {
             if (contextList != null && contextList.size() > 0) {
                 _handleMessageAction.accept(contextList);
             }
+        } catch (Exception ex) {
+            _logger.error(String.format("Event mailbox run has unknown exception, aggregateRootId: %s", _aggregateRootId), ex);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                //ignore
+                e.printStackTrace();
+            }
         } finally {
             if (contextList == null || contextList.size() == 0) {
-                exitHandlingMessage();
+                exit();
                 if (!_messageQueue.isEmpty()) {
-                    registerForExecution(false);
+                    tryRun();
                 }
             }
         }
     }
 
-    public void exitHandlingMessage() {
+    public void exit() {
 //        _isHandlingMessage.set(false);
 //        _isHandlingMessage.compareAndSet(true, false);
-        _isHandlingMessage.getAndSet(false);
+        _isRunning.getAndSet(false);
     }
 
-    public void registerForExecution(boolean exitFirst) {
-        if (exitFirst) {
-            exitHandlingMessage();
-        }
-        if (enterHandlingMessage()) {
-            CompletableFuture.runAsync(this::run);
-        }
+
+    public void clear() {
+        _messageQueue.clear();
     }
 
-    private boolean enterHandlingMessage() {
-        return _isHandlingMessage.compareAndSet(false, true);
+    private boolean tryEnter() {
+        return _isRunning.compareAndSet(false, true);
     }
 }

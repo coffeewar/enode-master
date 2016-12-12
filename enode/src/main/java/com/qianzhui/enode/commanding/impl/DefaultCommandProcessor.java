@@ -14,14 +14,12 @@ import java.util.concurrent.ConcurrentMap;
 public class DefaultCommandProcessor implements ICommandProcessor {
     private final ILogger _logger;
     private final ConcurrentMap<String, ProcessingCommandMailbox> _mailboxDict;
-    private final IProcessingCommandScheduler _scheduler;
     private final IProcessingCommandHandler _handler;
 
     @Inject
-    public DefaultCommandProcessor(IProcessingCommandScheduler scheduler, IProcessingCommandHandler handler, ILoggerFactory loggerFactory)
+    public DefaultCommandProcessor(IProcessingCommandHandler handler, ILoggerFactory loggerFactory)
     {
         _mailboxDict = new ConcurrentHashMap<>();
-        _scheduler = scheduler;
         _handler = handler;
         _logger = loggerFactory.create(getClass());
     }
@@ -34,7 +32,7 @@ public class DefaultCommandProcessor implements ICommandProcessor {
             throw new IllegalArgumentException("aggregateRootId of command cannot be null or empty, commandId:" + processingCommand.getMessage().id());
         }
 
-        ProcessingCommandMailbox mailbox = _mailboxDict.computeIfAbsent(aggregateRootId, x -> new ProcessingCommandMailbox(x, _scheduler, _handler, _logger));
+        ProcessingCommandMailbox mailbox = _mailboxDict.computeIfAbsent(aggregateRootId, x -> new ProcessingCommandMailbox(x, _handler, _logger));
         mailbox.enqueueMessage(processingCommand);
     }
 }

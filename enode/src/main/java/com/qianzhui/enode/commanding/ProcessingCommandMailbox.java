@@ -1,11 +1,12 @@
 package com.qianzhui.enode.commanding;
 
-import com.qianzhui.enode.common.io.IORuntimeException;
+import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.logging.ILogger;
+import com.qianzhui.enode.common.threading.ManualResetEvent;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,28 +20,33 @@ public class ProcessingCommandMailbox {
     private final Object _lockObj2 = new Object();
     private final String _aggregateRootId;
     private final ConcurrentMap<Long, ProcessingCommand> _messageDict;
-    private final Map<Long, CommandResult> _requestToCompleteSequenceDict;
-    private final IProcessingCommandScheduler _scheduler;
+    private final Map<Long, CommandResult> _requestToCompleteCommandDict;
     private final IProcessingCommandHandler _messageHandler;
+    private final ManualResetEvent _pauseWaitHandle;
+    private final ManualResetEvent _processingWaitHandle;
+    private final int _batchSize;
     private long _nextSequence;
     private long _consumingSequence;
     private long _consumedSequence;
-    private AtomicBoolean _isHandlingMessage;
-    private int _isPaused;
+    private AtomicBoolean _isRunning;
+    private boolean _isPaused;
+    private boolean _isProcessingCommand;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
     }
 
-    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandScheduler scheduler, IProcessingCommandHandler messageHandler, ILogger logger) {
+    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandHandler messageHandler, ILogger logger) {
         _messageDict = new ConcurrentHashMap<>();
-        _requestToCompleteSequenceDict = new HashMap<>();
+        _requestToCompleteCommandDict = new HashMap<>();
+        _pauseWaitHandle = new ManualResetEvent(false);
+        _processingWaitHandle = new ManualResetEvent(false);
+        _batchSize = ENode.getInstance().getSetting().getCommandMailBoxPersistenceMaxBatchSize();
         _aggregateRootId = aggregateRootId;
-        _scheduler = scheduler;
         _messageHandler = messageHandler;
         _logger = logger;
         _consumedSequence = -1;
-        _isHandlingMessage = new AtomicBoolean(false);
+        _isRunning = new AtomicBoolean(false);
     }
 
     public void enqueueMessage(ProcessingCommand message) {
@@ -53,30 +59,26 @@ public class ProcessingCommandMailbox {
                 _nextSequence++;
             }
         }
-        registerForExecution();
+        tryRun();
     }
 
-    public boolean enterHandlingMessage() {
-        return _isHandlingMessage.compareAndSet(false, true);
+    public void pause() {
+        _pauseWaitHandle.reset();
+        while (_isProcessingCommand) {
+            _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _processingWaitHandle.waitOne(1000);
+        }
+        _isPaused = true;
     }
 
-    public void pauseHandlingMessage() {
-        _isPaused = 1;
+    public void resume() {
+        _isPaused = false;
+        _pauseWaitHandle.set();
+        tryRun();
     }
 
     public void resetConsumingSequence(long consumingSequence) {
         _consumingSequence = consumingSequence;
-    }
-
-    public void resumeHandlingMessage() {
-        _isPaused = 0;
-        //tryExecuteNextMessage();
-        registerForExecution();
-    }
-
-    public void tryExecuteNextMessage() {
-        exitHandlingMessage();
-        registerForExecution();
     }
 
     public void completeMessage(ProcessingCommand processingCommand, CommandResult commandResult) {
@@ -85,76 +87,77 @@ public class ProcessingCommandMailbox {
             try {
                 if (processingCommand.getSequence() == _consumedSequence + 1) {
                     _messageDict.remove(processingCommand.getSequence());
-                    completeCommandWithResult(processingCommand, commandResult);
+                    completeCommand(processingCommand, commandResult);
                     _consumedSequence = processNextCompletedCommands(processingCommand.getSequence());
                 } else if (processingCommand.getSequence() > _consumedSequence + 1) {
-                    _requestToCompleteSequenceDict.put(processingCommand.getSequence(), commandResult);
+                    _requestToCompleteCommandDict.put(processingCommand.getSequence(), commandResult);
                 } else if (processingCommand.getSequence() < _consumedSequence + 1) {
                     _messageDict.remove(processingCommand.getSequence());
-                    completeCommandWithResult(processingCommand, commandResult);
-                    _requestToCompleteSequenceDict.remove(processingCommand.getSequence());
-                }
-                if (_logger.isDebugEnabled()) {
-                    _logger.debug("Command mailbox complete command success, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId());
+                    completeCommand(processingCommand, commandResult);
+                    _requestToCompleteCommandDict.remove(processingCommand.getSequence());
                 }
             } catch (Exception ex) {
                 _logger.error(String.format("Command mailbox complete command failed, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId()), ex);
-            } finally {
-                registerForExecution();
             }
         }
     }
 
     public void run() {
-        if (_isPaused == 1) {
-            return;
+        while (_isPaused) {
+            _logger.info("Command mailbox is pausing and we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _pauseWaitHandle.waitOne(1000);
         }
-        boolean hasException = false;
-        ProcessingCommand processingMessage = null;
-        try {
-            if (hasRemainningMessage()) {
-                processingMessage = getNextMessage();
-                increaseConsumingSequence();
 
-                if (processingMessage != null) {
-                    _messageHandler.handleAsync(processingMessage);
+        ProcessingCommand processingCommand = null;
+
+        try {
+            _processingWaitHandle.reset();
+            _isProcessingCommand = true;
+            int count = 0;
+
+            while (_consumingSequence < _nextSequence && count < _batchSize) {
+                processingCommand = getProcessingCommand(_consumingSequence);
+
+                if (processingCommand != null) {
+                    _messageHandler.handle(processingCommand);
                 }
+                _consumingSequence++;
+                count++;
             }
         } catch (Throwable ex) {
-            hasException = true;
-
-            if (ex instanceof IOException || ex instanceof IORuntimeException) {
-                //We need to retry the command.
-                decreaseConsumingSequence();
-            }
-
-            if (processingMessage != null) {
-                ICommand command = processingMessage.getMessage();
-                _logger.error(String.format("Failed to handle command [id: %s, type: %s], aggregateId: %s", command.id(), command.getClass().getName(), _aggregateRootId), ex);
-            } else {
-                _logger.error(String.format("Failed to run command mailbox, aggregateId: %s", _aggregateRootId), ex);
+            _logger.error(String.format("Command mailbox run has unknown exception, aggregateRootId: %s, commandId: %s", _aggregateRootId, processingCommand != null ? processingCommand.getMessage().id() : ""), ex);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                //ignore
+                e.printStackTrace();
             }
         } finally {
-            if (hasException || processingMessage == null) {
-                exitHandlingMessage();
-                if (hasRemainningMessage()) {
-                    registerForExecution();
-                }
+            _isProcessingCommand = false;
+            _processingWaitHandle.set();
+            exit();
+            if (_consumingSequence < _nextSequence) {
+                tryRun();
             }
         }
+    }
+
+    private ProcessingCommand getProcessingCommand(long sequence) {
+        return _messageDict.get(sequence);
     }
 
     private long processNextCompletedCommands(long baseSequence) {
         long returnSequence = baseSequence;
         long nextSequence = baseSequence + 1;
 
-        while (_requestToCompleteSequenceDict.containsKey(nextSequence)) {
+        while (_requestToCompleteCommandDict.containsKey(nextSequence)) {
             ProcessingCommand processingCommand = _messageDict.remove(nextSequence);
 
             if (processingCommand != null) {
-                completeCommandWithResult(processingCommand, _requestToCompleteSequenceDict.get(nextSequence));
+                CommandResult commandResult = _requestToCompleteCommandDict.get(nextSequence);
+                completeCommand(processingCommand, commandResult);
             }
-            _requestToCompleteSequenceDict.remove(nextSequence);
+            _requestToCompleteCommandDict.remove(nextSequence);
             returnSequence = nextSequence;
 
             nextSequence++;
@@ -163,7 +166,7 @@ public class ProcessingCommandMailbox {
         return returnSequence;
     }
 
-    private void completeCommandWithResult(ProcessingCommand processingCommand, CommandResult commandResult) {
+    private void completeCommand(ProcessingCommand processingCommand, CommandResult commandResult) {
         try {
             processingCommand.complete(commandResult);
         } catch (Exception ex) {
@@ -171,28 +174,17 @@ public class ProcessingCommandMailbox {
         }
     }
 
-    private void exitHandlingMessage() {
-//        _isHandlingMessage.compareAndSet(true, false);
-        _isHandlingMessage.getAndSet(false);
+    private void tryRun() {
+        if (tryEnter()) {
+            CompletableFuture.runAsync(this::run);
+        }
     }
 
-    private boolean hasRemainningMessage() {
-        return _consumingSequence < _nextSequence;
+    private boolean tryEnter() {
+        return _isRunning.compareAndSet(false, true);
     }
 
-    private ProcessingCommand getNextMessage() {
-        return _messageDict.get(_consumingSequence);
-    }
-
-    private void increaseConsumingSequence() {
-        _consumingSequence++;
-    }
-
-    private void decreaseConsumingSequence() {
-        _consumingSequence--;
-    }
-
-    private void registerForExecution() {
-        _scheduler.scheduleMailbox(this);
+    private void exit() {
+        _isRunning.getAndSet(false);
     }
 }
