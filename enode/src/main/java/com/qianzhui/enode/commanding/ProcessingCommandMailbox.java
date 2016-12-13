@@ -86,6 +86,7 @@ public class ProcessingCommandMailbox {
     public void resetConsumingSequence(long consumingSequence) {
         _lastActiveTime = new Date();
         _consumingSequence = consumingSequence;
+        _requestToCompleteCommandDict.clear();
     }
 
     public void completeMessage(ProcessingCommand processingCommand, CommandResult commandResult) {
