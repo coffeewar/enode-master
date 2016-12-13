@@ -172,7 +172,6 @@ public class ENode {
 
         ObjectContainer.register(ICommandAsyncHandlerProvider.class, DefaultCommandAsyncHandlerProvider.class);
         ObjectContainer.register(ICommandHandlerProvider.class, DefaultCommandHandlerProvider.class);
-        ObjectContainer.register(ICommandStore.class, InMemoryCommandStore.class);
         ObjectContainer.register(ICommandRoutingKeyProvider.class, DefaultCommandRoutingKeyProvider.class);
         ObjectContainer.register(ICommandService.class, NotImplementedCommandService.class);
 
@@ -214,9 +213,12 @@ public class ENode {
 
         ObjectContainer.register(ICommandProcessor.class, DefaultCommandProcessor.class);
 
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}, DefaultApplicationMessageProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}, DefaultDomainEventProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}, DefaultPublishableExceptionProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, DefaultApplicationMessageProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, DefaultDomainEventProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, DefaultPublishableExceptionProcessor.class);
 
         /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
@@ -260,22 +262,12 @@ public class ENode {
 
     public ENode useMysqlComponents(DataSource ds) {
         return useMysqlLockService(ds, null)
-                .useMysqlCommandStore(ds, null)
                 .useMysqlEventStore(ds, null)
                 .useMysqlPublishedVersionStore(ds, null);
     }
 
     public ENode useMysqlLockService(DataSource ds, OptionSetting optionSetting) {
         ObjectContainer.registerInstance(ILockService.class, new MysqlLockService(ds, optionSetting));
-
-        return this;
-    }
-
-    public ENode useMysqlCommandStore(DataSource ds, OptionSetting optionSetting) {
-        //使用Provider注册，延迟MysqlCommandStore初始化，因为初始化时需要调用IOC容器(Guice)，而容器此时可能没有初始化
-        ObjectContainer.register(ICommandStore.class, null, () -> {
-            return new MysqlCommandStore(ds, optionSetting);
-        }, LifeStyle.Singleton);
 
         return this;
     }
@@ -613,9 +605,12 @@ public class ENode {
         ObjectContainer.resolve(ICommandProcessor.class).start();
         ObjectContainer.resolve(IEventService.class).start();
 
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}).start();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}).start();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }).start();
     }
 
     private void stopENodeComponents() {
@@ -623,9 +618,12 @@ public class ENode {
         ObjectContainer.resolve(ICommandProcessor.class).stop();
         ObjectContainer.resolve(IEventService.class).stop();
 
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>(){}).stop();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {}).stop();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {}).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }).stop();
     }
 
     public void shutdown() {
