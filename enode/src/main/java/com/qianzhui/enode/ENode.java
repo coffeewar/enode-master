@@ -325,9 +325,9 @@ public class ENode {
 
     //TODO endoe component types
     private static final Set<Class> ENODE_COMPONENT_TYPES = new HashSet<Class>() {{
-//        add(ICommandHandler.class);
-//        add(ICommandAsyncHandler.class);
-//        add(IMessageHandler.class);
+        add(ICommandHandler.class);
+        add(ICommandAsyncHandler.class);
+        add(IMessageHandler.class);
         add(IAggregateRepository.class);
         add(ITopicProvider.class);
     }};
