@@ -35,13 +35,13 @@ public class Main {
         /**============= Enode所需消息队列配置，ONS实现 ======*/
         producerSetting = new Properties();
         producerSetting.setProperty(PropertyKeyConst.ProducerId, "PID_NoteSample");
-        producerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
-        producerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
+        producerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey");
+        producerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey");
 
         consumerSetting = new Properties();
         consumerSetting.setProperty(PropertyKeyConst.ConsumerId, "CID_NoteSample");
-        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
-        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
+        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey");
+        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey");
         /**=============================================================*/
 
         /**============= Enode数据库配置（内存实现不需要配置） ===========*/
