@@ -70,8 +70,6 @@ public abstract class AbstractAsyncDenormalizer {
                 } catch (SQLException ex) {
                     connection.rollback();
                     throw new IORuntimeException(ex.getMessage(), ex);
-                } finally {
-                    connection.close();
                 }
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
@@ -88,7 +86,7 @@ public abstract class AbstractAsyncDenormalizer {
     }
 
     protected QueryRunnerExecuter batchStatement(String sql, Object[][] params) {
-        return new BatchExecuter(sql, params);
+        return new BatchExecuter(sql, params, true);
     }
 
     protected interface QueryRunnerExecuter {
@@ -156,16 +154,43 @@ public abstract class AbstractAsyncDenormalizer {
 
         private String sql;
         private Object[][] params;
+        private boolean ignoreDuplicate;
 
-        public BatchExecuter(String sql, Object[][] params) {
+        public BatchExecuter(String sql, Object[][] params, boolean ignoreDuplicate) {
             this.sql = sql;
             this.params = params;
+            this.ignoreDuplicate = ignoreDuplicate;
         }
 
         @Override
         public int update(QueryRunner queryRunner, Connection connection) throws SQLException {
-            queryRunner.batch(connection, sql, params);
-            return 0;
+            try {
+                queryRunner.batch(connection, sql, params);
+                return 0;
+            } catch (SQLException ex) {
+                if (ex.getErrorCode() == 1062 && ignoreDuplicate) { //主键冲突，忽略即可；出现这种情况，是因为同一个消息的重复处理
+                    insertOneByOne(queryRunner, connection);
+                    return 0;
+                }
+                throw ex;
+            }
+        }
+
+        private void insertOneByOne(QueryRunner queryRunner, Connection connection) throws SQLException {
+            for (int i = 0; i < params.length; i++) {
+                Object[] parameters = params[i];
+
+                try {
+                    queryRunner.update(connection, sql, parameters);
+                } catch (SQLException ex) {
+                    if (ex.getErrorCode() == 1062 && ignoreDuplicate) {
+                        //ignore
+                        return;
+                    }
+
+                    throw ex;
+                }
+            }
         }
     }
 }
