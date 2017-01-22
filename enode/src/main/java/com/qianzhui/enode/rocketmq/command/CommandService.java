@@ -120,7 +120,6 @@ public class CommandService implements ICommandService {
             _commandResultProcessor.registerProcessingCommand(command, commandReturnType, taskCompletionSource);
 
             CompletableFuture<AsyncTaskResult> sendMessageAsync = _sendMessageService.sendMessageAsync(_producer, buildCommandMessage(command, true), _commandKeyProvider.getKey(command), command.id(), null);
-
             sendMessageAsync.thenAccept(sendResult -> {
                 if (sendResult.getStatus().equals(AsyncTaskStatus.Success)) {
                     //_commandResultProcessor中会继续等命令或事件处理完成的状态
