@@ -30,8 +30,8 @@ public class ProcessingCommandMailbox {
     private long _consumingSequence;
     private long _consumedSequence;
     private AtomicBoolean _isRunning;
-    private boolean _isPaused;
-    private boolean _isProcessingCommand;
+    private volatile boolean _isPaused;
+    private volatile boolean _isProcessingCommand;
     private Date _lastActiveTime;
 
     public String getAggregateRootId() {
