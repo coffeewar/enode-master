@@ -1,12 +1,15 @@
 package com.qianzhui.enode.common.thirdparty.log4j;
 
 import com.qianzhui.enode.common.logging.ILogger;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 /**
  * Created by junbo_xu on 2016/3/1.
  */
 public class Log4jLogger implements ILogger {
+
+    private final static String FQCN = Log4jLogger.class.getName();
 
     private Logger log;
 
@@ -21,101 +24,101 @@ public class Log4jLogger implements ILogger {
 
     @Override
     public void debug(Object message) {
-        log.debug(message);
+        log.log(FQCN, Level.DEBUG, message, null);
     }
 
     @Override
     public void debug(String format, Object... args) {
-        log.debug(format(format, args));
+        log.log(FQCN, Level.DEBUG, format(format, args), null);
     }
 
     @Override
     public void debug(Object message, Exception exception) {
-        log.debug(message, exception);
+        log.log(FQCN, Level.DEBUG, message, exception);
     }
 
     @Override
     public void debug(Object message, Throwable exception) {
-        log.debug(message, exception);
+        log.log(FQCN, Level.DEBUG, message, exception);
     }
 
     @Override
     public void info(Object message) {
-        log.info(message);
+        log.log(FQCN, Level.INFO, message, null);
     }
 
     @Override
     public void info(String format, Object... args) {
-        log.info(format(format, args));
+        log.log(FQCN, Level.INFO, format(format, args), null);
     }
 
     @Override
     public void info(Object message, Exception exception) {
-        log.info(message, exception);
+        log.log(FQCN, Level.INFO, message, exception);
     }
 
     @Override
     public void info(Object message, Throwable exception) {
-        log.info(message, exception);
+        log.log(FQCN, Level.INFO, message, exception);
     }
 
     @Override
     public void error(Object message) {
-        log.error(message);
+        log.log(FQCN, Level.ERROR, message, null);
     }
 
     @Override
     public void error(String format, Object... args) {
-        log.error(format(format, args));
+        log.log(FQCN, Level.ERROR, format(format, args), null);
     }
 
     @Override
     public void error(Object message, Exception exception) {
-        log.error(message, exception);
+        log.log(FQCN, Level.ERROR, message, exception);
     }
 
     public void error(Object message, Throwable exception) {
-        log.error(message, exception);
+        log.log(FQCN, Level.ERROR, message, exception);
     }
 
     @Override
     public void warn(Object message) {
-        log.warn(message);
+        log.log(FQCN, Level.WARN, message, null);
     }
 
     @Override
     public void warn(String format, Object... args) {
-        log.warn(format(format, args));
+        log.log(FQCN, Level.WARN, format(format, args), null);
     }
 
     @Override
     public void warn(Object message, Exception exception) {
-        log.warn(message, exception);
+        log.log(FQCN, Level.WARN, message, exception);
     }
 
     @Override
     public void warn(Object message, Throwable exception) {
-        log.warn(message, exception);
+        log.log(FQCN, Level.WARN, message, exception);
     }
 
     @Override
     public void fatal(Object message) {
-        log.fatal(message);
+        log.log(FQCN, Level.FATAL, message, null);
     }
 
     @Override
     public void fatal(String format, Object... args) {
-        log.fatal(format(format, args));
+        log.log(FQCN, Level.FATAL, format(format, args), null);
     }
 
     @Override
     public void fatal(Object message, Exception exception) {
-        log.fatal(message, exception);
+        log.log(FQCN, Level.FATAL, message, exception);
     }
 
     @Override
     public void fatal(Object message, Throwable exception) {
-        log.fatal(message, exception);
+        log.log(FQCN, Level.FATAL, message, exception);
     }
 
     private String format(String format, Object... args) {
