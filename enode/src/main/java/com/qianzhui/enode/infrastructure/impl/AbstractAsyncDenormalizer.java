@@ -42,6 +42,10 @@ public abstract class AbstractAsyncDenormalizer {
         });
     }
 
+    public CompletableFuture<AsyncTaskResult> tryInsertRecordAsync(InsertExecuter insertExecuter) {
+        return tryInsertRecordAsync(insertExecuter.getSql(), insertExecuter.getParams());
+    }
+
     public CompletableFuture<AsyncTaskResult> tryUpdateRecordAsync(String sql, Object... params) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -51,6 +55,10 @@ public abstract class AbstractAsyncDenormalizer {
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
         });
+    }
+
+    public CompletableFuture<AsyncTaskResult> tryUpdateRecordAsync(UpdateExecuter updateExecuter) {
+        return tryUpdateRecordAsync(updateExecuter.getSql(), updateExecuter.getParams());
     }
 
     public CompletableFuture<AsyncTaskResult> tryTransactionAsync(QueryRunnerExecuter... executers) {
@@ -77,11 +85,11 @@ public abstract class AbstractAsyncDenormalizer {
         });
     }
 
-    protected QueryRunnerExecuter insertStatement(String sql, Object... params) {
+    protected InsertExecuter insertStatement(String sql, Object... params) {
         return new InsertExecuter(sql, params);
     }
 
-    protected QueryRunnerExecuter updateStatement(String sql, Object... params) {
+    protected UpdateExecuter updateStatement(String sql, Object... params) {
         return new UpdateExecuter(sql, params);
     }
 
@@ -124,14 +132,14 @@ public abstract class AbstractAsyncDenormalizer {
         }
     }
 
-    static class UpdateExecuter extends AbstractQueryRunnerExecuter {
+    public static class UpdateExecuter extends AbstractQueryRunnerExecuter {
 
         public UpdateExecuter(String sql, Object[] params) {
             super(sql, params);
         }
     }
 
-    static class InsertExecuter extends AbstractQueryRunnerExecuter {
+    public static class InsertExecuter extends AbstractQueryRunnerExecuter {
         public InsertExecuter(String sql, Object[] params) {
             super(sql, params);
         }

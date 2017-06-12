@@ -21,9 +21,11 @@ import com.qianzhui.enode.rocketmq.client.Producer;
 
 import javax.inject.Inject;
 import java.net.*;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 /**
  * Created by junbo_xu on 2016/3/1.
@@ -80,6 +82,35 @@ public class CommandService implements ICommandService {
         } catch (Exception ex) {
             return CompletableFuture.completedFuture(new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage()));
         }
+    }
+
+    @Override
+    public CompletableFuture<AsyncTaskResult> sendAsyncAll(ICommand... commands) {
+        Optional<CompletableFuture<AsyncTaskResult>> reduce = Arrays.asList(commands).stream()
+                .map(this::sendAsync)
+                .reduce((result, current) ->
+                        result.thenCombine(current, this::combine)
+                );
+
+        return reduce.get();
+    }
+
+    private AsyncTaskResult combine(AsyncTaskResult r1, AsyncTaskResult r2) {
+        Set<AsyncTaskResult> totalResult = new HashSet<>();
+        totalResult.add(r1);
+        totalResult.add(r2);
+
+        List<AsyncTaskResult> failedResults = totalResult.stream().filter(task -> task.getStatus() == AsyncTaskStatus.Failed).collect(Collectors.toList());
+        if (failedResults.size() > 0) {
+            return new AsyncTaskResult(AsyncTaskStatus.Failed, String.join("|", failedResults.stream().map(AsyncTaskResult::getErrorMessage).collect(Collectors.toList())));
+        }
+
+        List<AsyncTaskResult> ioExceptionResults = totalResult.stream().filter(task -> task.getStatus() == AsyncTaskStatus.IOException).collect(Collectors.toList());
+        if (ioExceptionResults.size() > 0) {
+            return new AsyncTaskResult(AsyncTaskStatus.IOException, String.join("|", ioExceptionResults.stream().map(AsyncTaskResult::getErrorMessage).collect(Collectors.toList())));
+        }
+
+        return AsyncTaskResult.Success;
     }
 
     @Override
