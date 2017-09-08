@@ -14,6 +14,7 @@ import java.util.logging.Logger;
  */
 public class GuiceObjectContainer implements IObjectContainer {
     private Map<Key, GuiceModule> iocMap = new HashMap<>();
+    private List<Class> staticInjections = new ArrayList<>();
     private Injector container;
     private Module module;
 
@@ -23,9 +24,10 @@ public class GuiceObjectContainer implements IObjectContainer {
     @Override
     public boolean commitRegisters() {
         if (!iocMap.isEmpty()) {
-            override(new GuiceMapModule(container, iocMap));
+            override(new GuiceMapModule(container, iocMap, staticInjections));
 
             iocMap.clear();
+            //staticInjections.clear(); 是否需要清除
             return true;
         }
 
@@ -39,11 +41,13 @@ public class GuiceObjectContainer implements IObjectContainer {
             add(Key.get(Stage.class));
         }};
         private Map<Key, GuiceModule> iocMap;
+        private List<Class> staticInjections = new ArrayList<>();
         private Injector parent;
 
-        public GuiceMapModule(Injector parent, Map<Key, GuiceModule> iocMap) {
+        public GuiceMapModule(Injector parent, Map<Key, GuiceModule> iocMap, List<Class> staticInjections) {
             this.parent = parent;
             this.iocMap = new HashMap<>(iocMap);
+            this.staticInjections = staticInjections;
         }
 
         @Override
@@ -55,6 +59,7 @@ public class GuiceObjectContainer implements IObjectContainer {
                     bind(key).toProvider(entry.getValue().getProvider());
                 });
             }
+            staticInjections.stream().forEach(clazz->binder().requestStaticInjection(clazz));
             iocMap.values().forEach(binder -> binder.bind(binder()));
         }
 
@@ -96,6 +101,11 @@ public class GuiceObjectContainer implements IObjectContainer {
 
     private void register(GuiceModule module) {
         iocMap.put(module.key(), module);
+    }
+
+    @Override
+    public void registerStaticInjection(Class staticInjectionClass) {
+        staticInjections.add(staticInjectionClass);
     }
 
     @Override

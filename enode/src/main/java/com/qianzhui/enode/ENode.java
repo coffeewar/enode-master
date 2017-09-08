@@ -365,6 +365,11 @@ public class ENode {
         return ENODE_GENERIC_COMPONENT_TYPES.stream().anyMatch(x -> x.isAssignableFrom(type));
     }
 
+    public ENode registerStaticInjection(Class staticInjectionClass) {
+        ObjectContainer.registerStaticInjection(staticInjectionClass);
+        return this;
+    }
+
     public ENode registerDefaultComponents() {
         return useGuice()
                 .registerCommonComponents()

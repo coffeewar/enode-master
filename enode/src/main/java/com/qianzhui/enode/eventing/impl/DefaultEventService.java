@@ -204,7 +204,7 @@ public class DefaultEventService implements IEventService {
         ICommand command = context.getProcessingCommand().getMessage();
 
         _ioHelper.tryAsyncActionRecursively("FindEventByCommandIdAsync",
-                () -> _eventStore.findAsync(command.getAggregateRootId(), command.id()),
+                () -> _eventStore.findAsync(context.getEventStream().aggregateRootId(), command.id()),
                 currentRetryTimes -> tryToRepublishEventAsync(context, currentRetryTimes),
                 result ->
                 {
@@ -221,7 +221,7 @@ public class DefaultEventService implements IEventService {
                         String errorMessage = String.format("Command should be exist in the event store, but we cannot find it from the event store, this should not be happen, and we cannot continue again. commandType:%s, commandId:%s, aggregateRootId:%s",
                                 command.getClass().getName(),
                                 command.id(),
-                                command.getAggregateRootId());
+                                context.getEventStream().aggregateRootId());
                         _logger.fatal(errorMessage);
 
                         CommandResult commandResult = new CommandResult(CommandStatus.Failed, command.id(), command.getAggregateRootId(), "Command should be exist in the event store, but we cannot find it from the event store.", String.class.getName());

@@ -89,13 +89,13 @@ public class CommandService implements ICommandService {
         Optional<CompletableFuture<AsyncTaskResult>> reduce = Arrays.asList(commands).stream()
                 .map(this::sendAsync)
                 .reduce((result, current) ->
-                        result.thenCombine(current, this::combine)
+                        result.thenCombine(current, CommandService::combine)
                 );
 
         return reduce.get();
     }
 
-    private AsyncTaskResult combine(AsyncTaskResult r1, AsyncTaskResult r2) {
+    public static AsyncTaskResult combine(AsyncTaskResult r1, AsyncTaskResult r2) {
         Set<AsyncTaskResult> totalResult = new HashSet<>();
         totalResult.add(r1);
         totalResult.add(r2);
