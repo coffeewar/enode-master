@@ -126,6 +126,10 @@ public class ProcessingCommandMailbox {
             int count = 0;
 
             while (_consumingSequence < _nextSequence && count < _batchSize) {
+                if(_requestToCompleteCommandDict.containsKey(_consumingSequence)) {
+                    _consumingSequence++;
+                    continue;
+                }
                 processingCommand = getProcessingCommand(_consumingSequence);
 
                 if (processingCommand != null) {
