@@ -26,6 +26,7 @@ import com.qianzhui.enode.infrastructure.impl.*;
 import com.qianzhui.enode.infrastructure.impl.inmemory.InMemoryPublishedVersionStore;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlLockService;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlPublishedVersionStore;
+import com.qianzhui.enode.jmx.ENodeJMXAgent;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQConsumer;
 import com.qianzhui.enode.rocketmq.TopicTagData;
@@ -601,6 +602,7 @@ public class ENode {
         startENodeComponents();
         initializeBusinessAssemblies();
         startRocketMQComponents();
+        ENodeJMXAgent.startAgent();
         System.out.println("ENode started.");
         return this;
     }
