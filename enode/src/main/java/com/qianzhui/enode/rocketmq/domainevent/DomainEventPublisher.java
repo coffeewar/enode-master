@@ -66,16 +66,22 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
         EventStreamMessage eventMessage = createEventMessage(eventStream);
         TopicTagData topicTagData = _eventTopicProvider.getPublishTopic(null);
         String data = _jsonSerializer.serialize(eventMessage);
+        String key = buildRocketMQMessageKey(eventStream);
 
         byte[] body = BitConverter.getBytes(data);
 
-        //TODO eventstream tags
-        //TODO rocketmq message key of eventstream,default:eventStream.id()
         return new Message(topicTagData.getTopic(),
-//                eventStream.getTag(),
                 topicTagData.getTag(),
-                eventStream.id(),
+                key,
                 RocketMQMessageTypeCode.DomainEventStreamMessage.getValue(), body, true);
+    }
+
+    private String buildRocketMQMessageKey(DomainEventStreamMessage eventStreamMessage) {
+        return String.format("%s %s %s",
+                eventStreamMessage.id(), //事件流唯一id
+                "event_agg_" + eventStreamMessage.aggregateRootStringId(), //聚合根id
+                "event_cmd_" + eventStreamMessage.getCommandId() //命令id
+        );
     }
 
     private EventStreamMessage createEventMessage(DomainEventStreamMessage eventStream) {

@@ -1,6 +1,7 @@
 package com.qianzhui.enode.rocketmq.command;
 
 import com.alibaba.rocketmq.common.message.Message;
+import com.alibaba.rocketmq.common.message.MessageConst;
 import com.qianzhui.enode.commanding.*;
 import com.qianzhui.enode.common.container.GenericTypeLiteral;
 import com.qianzhui.enode.common.container.ObjectContainer;
@@ -177,13 +178,38 @@ public class CommandService implements ICommandService {
 
         byte[] body = BitConverter.getBytes(messageData);
 
-        String key = _commandKeyProvider.getKey(command);
+        String key = buildRocketMQMessageKey(command);
 
-        return new Message(topicTagData.getTopic(),
-//                _typeNameProvider.getTypeName(command.getClass()),
+        Message message = new Message(topicTagData.getTopic(),
                 topicTagData.getTag(),
                 key,
                 RocketMQMessageTypeCode.CommandMessage.ordinal(), body, true);
+
+        if (command.getStartDeliverTime() > 0) {
+            message.putUserProperty(RocketMQSystemPropKey.STARTDELIVERTIME, String.valueOf(command.getStartDeliverTime()));
+        }
+
+        return message;
+    }
+
+    private String buildRocketMQMessageKey(ICommand command) {
+        return String.format("%s%s",
+                command.id(), //命令唯一id
+                command.getAggregateRootId() == null ? "" : MessageConst.KEY_SEPARATOR + "cmd_agg_" + command.getAggregateRootId() //聚合根id
+        );
+    }
+
+    static public class RocketMQSystemPropKey {
+        public static final String TAG = "__TAG";
+        public static final String KEY = "__KEY";
+        public static final String MSGID = "__MSGID";
+        public static final String RECONSUMETIMES = "__RECONSUMETIMES";
+        /**
+         * 设置消息的定时投递时间（绝对时间),最大延迟时间为7天.
+         * <p>例1: 延迟投递, 延迟3s投递, 设置为: System.currentTimeMillis() + 3000;
+         * <p>例2: 定时投递, 2016-02-01 11:30:00投递, 设置为: new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2016-02-01 11:30:00").getTime()
+         */
+        public static final String STARTDELIVERTIME = "__STARTDELIVERTIME";
     }
 
     private String parseAddress(SocketAddress address) {

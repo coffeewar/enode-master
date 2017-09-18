@@ -7,6 +7,7 @@ import com.qianzhui.enode.infrastructure.Message;
  */
 public class Command<TAggregateRootId> extends Message implements ICommand {
     public TAggregateRootId aggregateRootId;
+    private long startDeliverTime;
 
     public Command() {
         super();
@@ -26,6 +27,16 @@ public class Command<TAggregateRootId> extends Message implements ICommand {
             return this.aggregateRootId.toString();
         else
             return null;
+    }
+
+    @Override
+    public long getStartDeliverTime() {
+        return startDeliverTime;
+    }
+
+    @Override
+    public void setStartDeliverTime(long startDeliverTime) {
+        this.startDeliverTime = startDeliverTime;
     }
 
     @Override
