@@ -1,5 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.IORuntimeException;
 import org.apache.commons.dbutils.QueryRunner;
@@ -8,6 +9,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 
 /**
@@ -16,15 +19,18 @@ import java.util.function.Function;
 public abstract class AbstractAsyncDenormalizer {
     protected final DataSource ds;
     protected final QueryRunner _queryRunner;
+    protected final Executor executor;
 
     public AbstractAsyncDenormalizer(DataSource ds) {
         this.ds = ds;
         this._queryRunner = new QueryRunner(ds);
+        executor = Executors.newFixedThreadPool(4, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("AsyncDenormalizerExecutor-%d").build());
     }
 
     public CompletableFuture<AsyncTaskResult> tryExecuteAsync(Function<QueryRunner, AsyncTaskResult> executer) {
         return CompletableFuture.supplyAsync(() ->
-                executer.apply(_queryRunner)
+                executer.apply(_queryRunner),
+                executor
         );
     }
 
@@ -39,7 +45,7 @@ public abstract class AbstractAsyncDenormalizer {
                 }
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
     }
 
     public CompletableFuture<AsyncTaskResult> tryInsertRecordAsync(InsertExecuter insertExecuter) {
@@ -54,7 +60,7 @@ public abstract class AbstractAsyncDenormalizer {
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
     }
 
     public CompletableFuture<AsyncTaskResult> tryUpdateRecordAsync(UpdateExecuter updateExecuter) {
@@ -82,7 +88,7 @@ public abstract class AbstractAsyncDenormalizer {
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
     }
 
     protected InsertExecuter insertStatement(String sql, Object... params) {
