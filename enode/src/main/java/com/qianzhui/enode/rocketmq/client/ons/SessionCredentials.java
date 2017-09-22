@@ -7,16 +7,13 @@ import java.util.Properties;
 
 import com.alibaba.rocketmq.common.MixAll;
 
-
-/**
- * @auther lansheng.zj
- */
 public class SessionCredentials {
     public static final Charset CHARSET = Charset.forName("UTF-8");
     public static final String AccessKey = "AccessKey";
     public static final String SecretKey = "SecretKey";
     public static final String Signature = "Signature";
     public static final String SignatureMethod = "SignatureMethod";
+    public static final String ONSChannelKey = "OnsChannel";
 
     public static final String KeyFile = System.getProperty("rocketmq.client.keyFile",
             System.getProperty("user.home") + File.separator + "onskey");
@@ -25,6 +22,7 @@ public class SessionCredentials {
     private String secretKey;
     private String signature;
     private String signatureMethod;
+    private ONSChannel onsChannel = ONSChannel.ALIYUN;
 
 
     public SessionCredentials() {
@@ -42,13 +40,19 @@ public class SessionCredentials {
         {
             String value = prop.getProperty(AccessKey);
             if (value != null) {
-                this.accessKey = value;
+                this.accessKey = value.trim();
             }
         }
         {
             String value = prop.getProperty(SecretKey);
             if (value != null) {
-                this.secretKey = value;
+                this.secretKey = value.trim();
+            }
+        }
+        {
+            Object value = prop.get(ONSChannelKey);
+            if (value != null) {
+                this.onsChannel = ONSChannel.valueOf(value.toString());
             }
         }
     }
@@ -94,6 +98,16 @@ public class SessionCredentials {
     }
 
 
+    public ONSChannel getOnsChannel() {
+        return onsChannel;
+    }
+
+
+    public void setOnsChannel(ONSChannel onsChannel) {
+        this.onsChannel = onsChannel;
+    }
+
+
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -102,6 +116,7 @@ public class SessionCredentials {
         result = prime * result + ((secretKey == null) ? 0 : secretKey.hashCode());
         result = prime * result + ((signature == null) ? 0 : signature.hashCode());
         result = prime * result + ((signatureMethod == null) ? 0 : signatureMethod.hashCode());
+        result = prime * result + ((onsChannel == null) ? 0 : onsChannel.hashCode());
         return result;
     }
 
@@ -114,31 +129,38 @@ public class SessionCredentials {
             return false;
         if (getClass() != obj.getClass())
             return false;
+
         SessionCredentials other = (SessionCredentials) obj;
         if (accessKey == null) {
             if (other.accessKey != null)
                 return false;
-        }
-        else if (!accessKey.equals(other.accessKey))
+        } else if (!accessKey.equals(other.accessKey))
             return false;
+
         if (secretKey == null) {
             if (other.secretKey != null)
                 return false;
-        }
-        else if (!secretKey.equals(other.secretKey))
+        } else if (!secretKey.equals(other.secretKey))
             return false;
+
         if (signature == null) {
             if (other.signature != null)
                 return false;
-        }
-        else if (!signature.equals(other.signature))
+        } else if (!signature.equals(other.signature))
             return false;
+
         if (signatureMethod == null) {
             if (other.signatureMethod != null)
                 return false;
-        }
-        else if (!signatureMethod.equals(other.signatureMethod))
+        } else if (!signatureMethod.equals(other.signatureMethod))
             return false;
+
+        if (onsChannel == null) {
+            if (other.onsChannel != null)
+                return false;
+        } else if (!onsChannel.equals(other.onsChannel))
+            return false;
+
         return true;
     }
 
@@ -146,6 +168,6 @@ public class SessionCredentials {
     @Override
     public String toString() {
         return "SessionCredentials [accessKey=" + accessKey + ", secretKey=" + secretKey + ", signature="
-                + signature + ", signatureMethod=" + signatureMethod + "]";
+                + signature + ", signatureMethod=" + signatureMethod + ", onsChannel=" + onsChannel + "]";
     }
 }
