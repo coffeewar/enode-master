@@ -1,6 +1,10 @@
 package com.qianzhui.enode.commanding.impl;
 
-import com.qianzhui.enode.commanding.*;
+import com.qianzhui.enode.commanding.ICommand;
+import com.qianzhui.enode.commanding.ICommandContext;
+import com.qianzhui.enode.commanding.ICommandHandler;
+import com.qianzhui.enode.commanding.ICommandHandlerProxy;
+import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 
 import java.lang.invoke.MethodHandle;
@@ -11,11 +15,13 @@ import java.lang.reflect.Method;
  */
 public class CommandHandlerProxy implements ICommandHandlerProxy {
 
+    private Class _commandHandlerType;
     private ICommandHandler _commandHandler;
     private MethodHandle _methodHandle;
     private Method _method;
 
-    public CommandHandlerProxy(ICommandHandler commandHandler, MethodHandle methodHandle, Method method) {
+    public CommandHandlerProxy(Class commandHandlerType, ICommandHandler commandHandler, MethodHandle methodHandle, Method method) {
+        _commandHandlerType = commandHandlerType;
         _commandHandler = commandHandler;
         _methodHandle = methodHandle;
         _method = method;
@@ -23,8 +29,9 @@ public class CommandHandlerProxy implements ICommandHandlerProxy {
 
     @Override
     public void handle(ICommandContext context, ICommand command) {
+        ICommandHandler handler = (ICommandHandler) getInnerObject();
         try {
-            _methodHandle.invoke(_commandHandler, context, command);
+            _methodHandle.invoke(handler, context, command);
         } catch (Exception e) {
             throw new WrappedRuntimeException(e);
         } catch (Throwable throwable) {
@@ -34,6 +41,14 @@ public class CommandHandlerProxy implements ICommandHandlerProxy {
 
     @Override
     public Object getInnerObject() {
-        return _commandHandler;
+        if (_commandHandler != null)
+            return _commandHandler;
+
+        return ObjectContainer.resolve(_commandHandlerType);
+    }
+
+    @Override
+    public Method getMethod() {
+        return _method;
     }
 }

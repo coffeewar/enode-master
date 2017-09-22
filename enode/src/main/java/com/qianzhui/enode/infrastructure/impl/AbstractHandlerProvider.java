@@ -1,10 +1,8 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.qianzhui.enode.common.container.LifeStyle;
 import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.infrastructure.IAssemblyInitializer;
-import com.qianzhui.enode.infrastructure.IObjectProxy;
-import com.qianzhui.enode.infrastructure.MessageHandlerData;
-import com.qianzhui.enode.infrastructure.Priority;
+import com.qianzhui.enode.infrastructure.*;
 import org.reflections.ReflectionUtils;
 
 import java.lang.invoke.MethodHandle;
@@ -18,7 +16,7 @@ import java.util.stream.Collectors;
 /**
  * Created by junbo_xu on 2016/3/21.
  */
-public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface extends IObjectProxy, THandlerSource> implements IAssemblyInitializer {
+public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface extends IObjectProxy & MethodInvocation, THandlerSource> implements IAssemblyInitializer {
     private Map<TKey, List<THandlerProxyInterface>> _handlerDict = new HashMap<>();
     private Map<TKey, MessageHandlerData<THandlerProxyInterface>> _messageHandlerDict = new HashMap<>();
     private MethodHandles.Lookup lookup = MethodHandles.lookup();
@@ -32,8 +30,6 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
     protected abstract Class<? extends THandlerProxyInterface> getHandlerProxyImplementationType();
 
     protected abstract boolean isHandlerSourceMatchKey(THandlerSource handlerSource, TKey key);
-
-    protected abstract boolean isHandleMethodMatchKey(Class[] argumentTypes, TKey key);
 
     protected abstract boolean isHandleMethodMatch(Method method);
 
@@ -63,7 +59,7 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
             Map<THandlerProxyInterface, Integer> queueHandlerDict = new HashMap<>();
 
             handlers.forEach(handler -> {
-                int priority = getHandleMethodPriority(handler, key);
+                int priority = getHandleMethodPriority(handler);
 
                 if (priority == 0) {
                     listHandlers.add(handler);
@@ -80,28 +76,26 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
         });
     }
 
-    private int getHandleMethodPriority(THandlerProxyInterface handler, TKey key) {
-        int priority = 0;
-        List<Method> handleAsyncMethods = Arrays.asList(handler.getInnerObject().getClass().getMethods()).stream().filter(x -> x.getName().equals("handleAsync")).collect(Collectors.toList());
+    private int getHandleMethodPriority(THandlerProxyInterface handler) {
+        Method method = handler.getMethod();
 
-        for (int i = 0, len = handleAsyncMethods.size(); i < len; i++) {
-            Method method = handleAsyncMethods.get(i);
-            Class<?>[] argumentTypes = method.getParameterTypes();
-            if (isHandleMethodMatchKey(argumentTypes, key)) {
-                Priority methodPriority = method.getAnnotation(Priority.class);
-                if (methodPriority != null) {
-                    priority = methodPriority.value();
-                }
-
-                if (priority == 0) {
-                    Priority classPriority = handler.getInnerObject().getClass().getAnnotation(Priority.class);
-                    if (classPriority != null)
-                        priority = classPriority.value();
-                }
+        if (method.getName().equals("handleAsync")) {
+            int priority = 0;
+            Priority methodPriority = method.getAnnotation(Priority.class);
+            if (methodPriority != null) {
+                priority = methodPriority.value();
             }
-        }
 
-        return priority;
+            if (priority == 0) {
+                Priority classPriority = handler.getInnerObject().getClass().getAnnotation(Priority.class);
+                if (classPriority != null)
+                    priority = classPriority.value();
+            }
+
+            return priority;
+        } else {
+            return 0;
+        }
     }
 
     private boolean isHandlerType(Class type) {
@@ -109,7 +103,8 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
     }
 
     private void registerHandler(Class handlerType) {
-        Object handleObj = ObjectContainer.resolve(handlerType);
+        LifeStyle lifeStyle = parseComponentLife(handlerType);
+        Object handleObj = lifeStyle == LifeStyle.Singleton ? ObjectContainer.resolve(handlerType) : null;
 
         Set<Method> handleMethods = ReflectionUtils.getMethods(handlerType, this::isHandleMethodMatch);
 
@@ -133,12 +128,22 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
                     throw new InvalidOperationException("Handler cannot handle duplicate message, handlerType:" + handlerType);
                 }*/
 
-                THandlerProxyInterface handlerProxy = getHandlerProxyImplementationType().getConstructor(getHandlerType(), MethodHandle.class, Method.class).newInstance(handleObj, handleMethod, method);
+                THandlerProxyInterface handlerProxy = getHandlerProxyImplementationType().getConstructor(Class.class, getHandlerType(), MethodHandle.class, Method.class).newInstance(handlerType, handleObj, handleMethod, method);
                 handlers.add(handlerProxy);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    private static LifeStyle parseComponentLife(Class type) {
+        Component annotation = (Component) type.getAnnotation(Component.class);
+
+        if (annotation != null) {
+            return annotation.life();
+        }
+
+        return LifeStyle.Singleton;
     }
 
 //    x -> {

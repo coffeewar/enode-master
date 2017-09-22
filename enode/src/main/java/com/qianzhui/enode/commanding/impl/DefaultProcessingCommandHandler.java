@@ -24,13 +24,12 @@ import java.util.stream.Collectors;
  */
 public class DefaultProcessingCommandHandler implements IProcessingCommandHandler {
     private IJsonSerializer _jsonSerializer;
-    private ICommandStore _commandStore;
     private IEventStore _eventStore;
     private ICommandHandlerProvider _commandHandlerProvider;
     private ICommandAsyncHandlerProvider _commandAsyncHandlerProvider;
     private ITypeNameProvider _typeNameProvider;
     private IEventService _eventService;
-    private IMessagePublisher<IApplicationMessage> _messagePublisher;
+    private IMessagePublisher<IApplicationMessage> _applicationMessagePublisher;
     private IMessagePublisher<IPublishableException> _exceptionPublisher;
     private IMemoryCache _memoryCache;
     private IOHelper _ioHelper;
@@ -39,25 +38,23 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     @Inject
     public DefaultProcessingCommandHandler(
             IJsonSerializer jsonSerializer,
-            ICommandStore commandStore,
             IEventStore eventStore,
             ICommandHandlerProvider commandHandlerProvider,
             ICommandAsyncHandlerProvider commandAsyncHandlerProvider,
             ITypeNameProvider typeNameProvider,
             IEventService eventService,
-            IMessagePublisher<IApplicationMessage> messagePublisher,
+            IMessagePublisher<IApplicationMessage> applicationMessagePublisher,
             IMessagePublisher<IPublishableException> exceptionPublisher,
             IMemoryCache memoryCache,
             IOHelper ioHelper,
             ILoggerFactory loggerFactory) {
         _jsonSerializer = jsonSerializer;
-        _commandStore = commandStore;
         _eventStore = eventStore;
         _commandHandlerProvider = commandHandlerProvider;
         _commandAsyncHandlerProvider = commandAsyncHandlerProvider;
         _typeNameProvider = typeNameProvider;
         _eventService = eventService;
-        _messagePublisher = messagePublisher;
+        _applicationMessagePublisher = applicationMessagePublisher;
         _exceptionPublisher = exceptionPublisher;
         _memoryCache = memoryCache;
         _ioHelper = ioHelper;
@@ -66,7 +63,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     }
 
     @Override
-    public void handleAsync(ProcessingCommand processingCommand) {
+    public void handle(ProcessingCommand processingCommand) {
         ICommand command = processingCommand.getMessage();
 
         if (command.getAggregateRootId() == null || command.getAggregateRootId().trim().equals("")) {
@@ -208,17 +205,16 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                         //_memoryCache.refreshAggregateFromEventStore(existingEventStream.aggregateRootTypeName(), existingEventStream.aggregateRootId());
                         _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.");
                         _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
-                        processingCommand.getMailbox().tryExecuteNextMessage();
                     } else {
                         //到这里，说明当前command执行遇到异常，然后当前command之前也没执行过，是第一次被执行。
                         //那就判断当前异常是否是需要被发布出去的异常，如果是，则发布该异常给所有消费者；否则，就记录错误日志；
                         //然后，认为该command处理失败即可；
 
                         Exception exp = exception;
-                        if(exp instanceof WrappedRuntimeException)
-                            exp = ((WrappedRuntimeException)exp).getException();
+                        if (exp instanceof WrappedRuntimeException)
+                            exp = ((WrappedRuntimeException) exp).getException();
 
-                        if(exp instanceof IPublishableException) {
+                        if (exp instanceof IPublishableException) {
                             IPublishableException publishableException = (IPublishableException) exp;
                             publishExceptionAsync(processingCommand, publishableException, 0);
                         } else {
@@ -291,36 +287,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     }*/
 
     private void handleCommand(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandHandler) {
-        if (commandHandler.checkCommandHandledFirst()) {
-            processCommand(processingCommand, commandHandler, 0);
-        } else {
-            handleCommandAsync(processingCommand, commandHandler, 0);
-        }
-    }
-
-    private void processCommand(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandAsyncHandler, int retryTimes) {
-        ICommand command = processingCommand.getMessage();
-
-        _ioHelper.tryAsyncActionRecursively("GetCommandAsync",
-                () -> _commandStore.getAsync(command.id()),
-                currentRetryTimes -> processCommand(processingCommand, commandAsyncHandler, currentRetryTimes),
-                result ->
-                {
-                    HandledCommand existingHandledCommand = result.getData();
-                    if (existingHandledCommand != null) {
-                        if (existingHandledCommand.getMessage() != null) {
-                            publishMessageAsync(processingCommand, existingHandledCommand.getMessage(), 0);
-                        } else {
-                            completeCommand(processingCommand, CommandStatus.Success, null, null);
-                        }
-                        return;
-                    }
-
-                    handleCommandAsync(processingCommand, commandAsyncHandler, 0);
-                },
-                () -> String.format("[commandId:%s,commandType:%s]", command.id(), command.getClass().getName()),
-                errorMessage -> _logger.fatal(String.format("Get command by id has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes, true, 3, 1000);
+        handleCommandAsync(processingCommand, commandHandler, 0);
     }
 
     private void handleCommandAsync(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandHandler, int retryTimes) {
@@ -357,82 +324,33 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                 },
                 currentRetryTimes -> handleCommandAsync(processingCommand, commandHandler, currentRetryTimes),
                 result ->
-                        commitChangesAsync(processingCommand, true, result.getData(), null, 0),
+                        commitChangesAsync(processingCommand, true, result.getData(), null),
                 () -> String.format("[command:[id:%s,type:%s],handlerType:%s]", command.id(), command.getClass().getName(), commandHandler.getInnerObject().getClass().getName()),
-                errorMessage -> commitChangesAsync(processingCommand, false, null, errorMessage, 0),
+                errorMessage -> commitChangesAsync(processingCommand, false, null, errorMessage),
                 retryTimes);
     }
 
-    private void commitChangesAsync(ProcessingCommand processingCommand, boolean success, IApplicationMessage message, String errorMessage, int retryTimes) {
-        ICommand command = processingCommand.getMessage();
-        HandledCommand handledCommand = new HandledCommand(command.id(), command.getAggregateRootId(), message);
-
-        _ioHelper.tryAsyncActionRecursively("AddCommandAsync",
-                () -> _commandStore.addAsync(handledCommand),
-                currentRetryTimes -> commitChangesAsync(processingCommand, success, message, errorMessage, currentRetryTimes),
-                result ->
-                {
-                    CommandAddResult commandAddResult = result.getData();
-                    if (commandAddResult == CommandAddResult.Success) {
-                        if (success) {
-                            if (message != null) {
-                                publishMessageAsync(processingCommand, message, 0);
-                            } else {
-                                completeCommand(processingCommand, CommandStatus.Success, null, null);
-                            }
-                        } else {
-                            completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), errorMessage);
-                        }
-                    } else if (commandAddResult == CommandAddResult.DuplicateCommand) {
-                        handleDuplicatedCommandAsync(processingCommand, 0);
-                    }
-                },
-                () -> String.format("[handledCommand:%s]", handledCommand),
-                error -> _logger.fatal(String.format("Add command has unknown exception, the code should not be run to here, errorMessage: %s", error)),
-                retryTimes, true, 3, 1000);
+    private void commitChangesAsync(ProcessingCommand processingCommand, boolean success, IApplicationMessage message, String errorMessage) {
+        if (success) {
+            if (message != null) {
+                publishMessageAsync(processingCommand, message, 0);
+            } else {
+                completeCommand(processingCommand, CommandStatus.Success, null, null);
+            }
+        } else {
+            completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), errorMessage);
+        }
     }
 
     private void publishMessageAsync(ProcessingCommand processingCommand, IApplicationMessage message, int retryTimes) {
         ICommand command = processingCommand.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("PublishApplicationMessageAsync",
-                () -> _messagePublisher.publishAsync(message),
+                () -> _applicationMessagePublisher.publishAsync(message),
                 currentRetryTimes -> publishMessageAsync(processingCommand, message, currentRetryTimes),
                 result -> completeCommand(processingCommand, CommandStatus.Success, message.getTypeName(), _jsonSerializer.serialize(message)),
                 () -> String.format("[application message:[id:%s,type:%s],command:[id:%s,type:%s]]", message.id(), message.getClass().getName(), command.id(), command.getClass().getName()),
                 errorMessage -> _logger.fatal(String.format("Publish application message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes, true, 3, 1000);
-    }
-
-    private void handleDuplicatedCommandAsync(ProcessingCommand processingCommand, int retryTimes) {
-        ICommand command = processingCommand.getMessage();
-
-        _ioHelper.tryAsyncActionRecursively("GetCommandAsync",
-                () -> _commandStore.getAsync(command.id()),
-                currentRetryTimes -> handleDuplicatedCommandAsync(processingCommand, currentRetryTimes),
-                result ->
-                {
-                    HandledCommand existingHandledCommand = result.getData();
-                    if (existingHandledCommand != null) {
-                        if (existingHandledCommand.getMessage() != null) {
-                            publishMessageAsync(processingCommand, existingHandledCommand.getMessage(), 0);
-                        } else {
-                            completeCommand(processingCommand, CommandStatus.Success, null, null);
-                        }
-                    } else {
-                        //到这里，说明当前command想添加到commandStore中时，提示command重复，但是尝试从commandStore中取出该command时却找不到该command。
-                        //出现这种情况，我们就无法再做后续处理了，这种错误理论上不会出现，除非commandStore的Add接口和Get接口出现读写不一致的情况；
-                        //我们记录错误日志，然后认为当前command已被处理为失败。
-                        String errorMessage = String.format("Command exist in the command store, but we cannot get it from the command store. commandType:%s, commandId:%s, aggregateRootId:%s",
-                                command.getClass().getName(),
-                                command.id(),
-                                command.getAggregateRootId());
-                        _logger.error(errorMessage);
-                        completeCommand(processingCommand, CommandStatus.Failed, null, errorMessage);
-                    }
-                },
-                () -> String.format("[command:[id:%s,type:%s]", command.id(), command.getClass().getName()),
-                errorMessage -> _logger.fatal(String.format("Get command by id has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true, 3, 1000);
     }
 
@@ -497,7 +415,6 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     private void completeCommand(ProcessingCommand processingCommand, CommandStatus commandStatus, String resultType, String result) {
         CommandResult commandResult = new CommandResult(commandStatus, processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId(), result, resultType);
         processingCommand.getMailbox().completeMessage(processingCommand, commandResult);
-        processingCommand.getMailbox().tryExecuteNextMessage();
     }
 
     enum HandlerFindStatus {

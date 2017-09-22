@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Created by junbo_xu on 2016/4/15.
  */
+//@Component(life = LifeStyle.Transient)
 public class NoteEventHandler implements IMessageHandler {
     private ILogger _logger;
 

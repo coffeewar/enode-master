@@ -1,5 +1,6 @@
 package com.qianzhui.enode.domain.impl;
 
+import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.scheduling.IScheduleService;
@@ -10,9 +11,12 @@ import com.qianzhui.enode.domain.IMemoryCache;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 
 import javax.inject.Inject;
-import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 /**
  * Created by junbo_xu on 2016/3/31.
@@ -22,18 +26,19 @@ public class DefaultMemoryCache implements IMemoryCache {
     private final IAggregateStorage _aggregateStorage;
     private final ITypeNameProvider _typeNameProvider;
     private final ILogger _logger;
+    private final IScheduleService _scheduleService;
+    private final int _timeoutSeconds;
+    private final String _taskName;
 
     @Inject
-    public DefaultMemoryCache(ITypeNameProvider typeNameProvider, IAggregateStorage aggregateStorage, IScheduleService scheduleService, ILoggerFactory loggerFactory) {
+    public DefaultMemoryCache(IScheduleService scheduleService, ITypeNameProvider typeNameProvider, IAggregateStorage aggregateStorage, ILoggerFactory loggerFactory) {
+        _scheduleService = scheduleService;
         _aggregateRootInfoDict = new ConcurrentHashMap<>();
         _typeNameProvider = typeNameProvider;
         _aggregateStorage = aggregateStorage;
         _logger = loggerFactory.create(getClass());
-    }
-
-    @Override
-    public Collection<AggregateCacheInfo> getAll() {
-        return _aggregateRootInfoDict.values();
+        _timeoutSeconds = ENode.getInstance().getSetting().getAggregateRootMaxInactiveSeconds();
+        _taskName = "CleanInactiveAggregates_" + System.nanoTime() + new Random().nextInt(10000);
     }
 
     @Override
@@ -80,10 +85,13 @@ public class DefaultMemoryCache implements IMemoryCache {
     }
 
     @Override
-    public boolean remove(Object aggregateRootId) {
-        if (aggregateRootId == null) throw new NullPointerException("aggregateRootId");
+    public void start() {
+        _scheduleService.startTask(_taskName, this::cleanInactiveAggregateRoot, ENode.getInstance().getSetting().getScanExpiredAggregateIntervalMilliseconds(), ENode.getInstance().getSetting().getScanExpiredAggregateIntervalMilliseconds());
+    }
 
-        return _aggregateRootInfoDict.remove(aggregateRootId.toString()) != null;
+    @Override
+    public void stop() {
+        _scheduleService.stopTask(_taskName);
     }
 
     private void setInternal(IAggregateRoot aggregateRoot) {
@@ -97,10 +105,22 @@ public class DefaultMemoryCache implements IMemoryCache {
                     oldValue.setLastUpdateTimeMillis(System.currentTimeMillis());
 
                     if (_logger.isDebugEnabled()) {
-                        _logger.debug("Aggregate memory cache refreshed, type: %s, id: %s, version: %d", aggregateRoot.getClass().getName(), aggregateRoot.uniqueId(), aggregateRoot.version());
+                        _logger.debug("In memory aggregate updated, type: %s, id: %s, version: %d", aggregateRoot.getClass().getName(), aggregateRoot.uniqueId(), aggregateRoot.version());
                     }
 
                     return oldValue;
                 });
+    }
+
+    private void cleanInactiveAggregateRoot() {
+        List<Map.Entry<String, AggregateCacheInfo>> inactiveList = _aggregateRootInfoDict.entrySet().stream()
+                .filter(entry -> entry.getValue().isExpired(_timeoutSeconds))
+                .collect(Collectors.toList());
+
+        inactiveList.stream().forEach(entry -> {
+            if (_aggregateRootInfoDict.remove(entry.getKey()) != null) {
+                _logger.info("Removed inactive aggregate root, id: %s", entry.getKey());
+            }
+        });
     }
 }

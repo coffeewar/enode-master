@@ -11,4 +11,6 @@ public interface ICommand extends IMessage {
      * Represents the associated aggregate root string id.
      */
     String getAggregateRootId();
+    long getStartDeliverTime();
+    void setStartDeliverTime(long startDeliverTime);
 }

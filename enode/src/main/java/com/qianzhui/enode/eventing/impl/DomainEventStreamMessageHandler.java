@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Created by junbo_xu on 2016/4/5.
  */
-public class DomainEventStreamMessageHandler extends AbstractSequenceProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> {
+public class DomainEventStreamMessageHandler extends AbstractSequenceProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> {
     private final IMessageDispatcher _dispatcher;
 
     @Inject

@@ -1,11 +1,13 @@
 package com.qianzhui.enode.commanding;
 
-import com.qianzhui.enode.common.io.IORuntimeException;
+import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.logging.ILogger;
+import com.qianzhui.enode.common.threading.ManualResetEvent;
 
-import java.io.IOException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,141 +21,170 @@ public class ProcessingCommandMailbox {
     private final Object _lockObj2 = new Object();
     private final String _aggregateRootId;
     private final ConcurrentMap<Long, ProcessingCommand> _messageDict;
-    private final Map<Long, CommandResult> _requestToCompleteOffsetDict;
-    private final IProcessingCommandScheduler _scheduler;
+    private final Map<Long, CommandResult> _requestToCompleteCommandDict;
     private final IProcessingCommandHandler _messageHandler;
-    private long _maxOffset;
-    private long _consumingOffset;
-    private long _consumedOffset;
-    private AtomicBoolean _isHandlingMessage;
-    private int _stopHandling;
+    private final ManualResetEvent _pauseWaitHandle;
+    private final ManualResetEvent _processingWaitHandle;
+    private final int _batchSize;
+    private long _nextSequence;
+    private long _consumingSequence;
+    private long _consumedSequence;
+    private AtomicBoolean _isRunning;
+    private volatile boolean _isPaused;
+    private volatile boolean _isProcessingCommand;
+    private Date _lastActiveTime;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
     }
 
-    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandScheduler scheduler, IProcessingCommandHandler messageHandler, ILogger logger) {
+    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandHandler messageHandler, ILogger logger) {
         _messageDict = new ConcurrentHashMap<>();
-        _requestToCompleteOffsetDict = new HashMap<>();
+        _requestToCompleteCommandDict = new HashMap<>();
+        _pauseWaitHandle = new ManualResetEvent(false);
+        _processingWaitHandle = new ManualResetEvent(false);
+        _batchSize = ENode.getInstance().getSetting().getCommandMailBoxPersistenceMaxBatchSize();
         _aggregateRootId = aggregateRootId;
-        _scheduler = scheduler;
         _messageHandler = messageHandler;
         _logger = logger;
-        _consumedOffset = -1;
-        _isHandlingMessage = new AtomicBoolean(false);
+        _consumedSequence = -1;
+        _isRunning = new AtomicBoolean(false);
+        _lastActiveTime = new Date();
     }
 
     public void enqueueMessage(ProcessingCommand message) {
         //TODO synchronized
         synchronized (_lockObj) {
-            message.setSequence(_maxOffset);
+            message.setSequence(_nextSequence);
             message.setMailbox(this);
-            _messageDict.putIfAbsent(message.getSequence(), message);
-            _maxOffset++;
+            ProcessingCommand processingCommand = _messageDict.putIfAbsent(message.getSequence(), message);
+            if (processingCommand == null) {
+                _nextSequence++;
+            }
         }
-        registerForExecution();
+        _lastActiveTime = new Date();
+        tryRun();
     }
 
-    public boolean enterHandlingMessage() {
-        return _isHandlingMessage.compareAndSet(false, true);
+    public void pause() {
+        _lastActiveTime = new Date();
+        _pauseWaitHandle.reset();
+        while (_isProcessingCommand) {
+            _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _processingWaitHandle.waitOne(1000);
+        }
+        _isPaused = true;
     }
 
-    public void stopHandlingMessage() {
-        _stopHandling = 1;
+    public void resume() {
+        _lastActiveTime = new Date();
+        _isPaused = false;
+        _pauseWaitHandle.set();
+        tryRun();
     }
 
-    public void resetConsumingOffset(long consumingOffset) {
-        _consumingOffset = consumingOffset;
+    public void resetConsumingSequence(long consumingSequence) {
+        _lastActiveTime = new Date();
+        _consumingSequence = consumingSequence;
+        _requestToCompleteCommandDict.clear();
     }
 
-    public void restartHandlingMessage() {
-        _stopHandling = 0;
-        //tryExecuteNextMessage();
-        registerForExecution();
-    }
-
-    public void tryExecuteNextMessage() {
-        exitHandlingMessage();
-        registerForExecution();
-    }
-
-    public void completeMessage(ProcessingCommand message, CommandResult commandResult) {
+    public void completeMessage(ProcessingCommand processingCommand, CommandResult commandResult) {
         //TODO synchronized
         synchronized (_lockObj2) {
-            if (message.getSequence() == _consumedOffset + 1) {
-                _messageDict.remove(message.getSequence());
-                _consumedOffset = message.getSequence();
-                completeMessageWithResult(message, commandResult);
-                processRequestToCompleteOffsets();
-            } else if (message.getSequence() > _consumedOffset + 1) {
-                _requestToCompleteOffsetDict.put(message.getSequence(), commandResult);
-            } else if (message.getSequence() < _consumedOffset + 1) {
-                _messageDict.remove(message.getSequence());
-                _requestToCompleteOffsetDict.remove(message.getSequence());
+            _lastActiveTime = new Date();
+            try {
+                if (processingCommand.getSequence() == _consumedSequence + 1) {
+                    _messageDict.remove(processingCommand.getSequence());
+                    completeCommand(processingCommand, commandResult);
+                    _consumedSequence = processNextCompletedCommands(processingCommand.getSequence());
+                } else if (processingCommand.getSequence() > _consumedSequence + 1) {
+                    _requestToCompleteCommandDict.put(processingCommand.getSequence(), commandResult);
+                } else if (processingCommand.getSequence() < _consumedSequence + 1) {
+                    _messageDict.remove(processingCommand.getSequence());
+                    completeCommand(processingCommand, commandResult);
+                    _requestToCompleteCommandDict.remove(processingCommand.getSequence());
+                }
+            } catch (Exception ex) {
+                _logger.error(String.format("Command mailbox complete command failed, commandId: %s, aggregateRootId: %s", processingCommand.getMessage().id(), processingCommand.getMessage().getAggregateRootId()), ex);
             }
         }
     }
 
     public void run() {
-        if (_stopHandling == 1) {
-            exitHandlingMessage();
-            if(_stopHandling == 0){
-                registerForExecution();
-            }
-            return;
+        _lastActiveTime = new Date();
+        while (_isPaused) {
+            _logger.info("Command mailbox is pausing and we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _pauseWaitHandle.waitOne(1000);
         }
-        boolean hasException = false;
-        ProcessingCommand processingMessage = null;
-        try {
-            if (hasRemainningMessage()) {
-                processingMessage = getNextMessage();
-                increaseConsumingOffset();
 
-                if (processingMessage != null) {
-                    _messageHandler.handleAsync(processingMessage);
+        ProcessingCommand processingCommand = null;
+
+        try {
+            _processingWaitHandle.reset();
+            _isProcessingCommand = true;
+            int count = 0;
+
+            while (_consumingSequence < _nextSequence && count < _batchSize) {
+                if(_requestToCompleteCommandDict.containsKey(_consumingSequence)) {
+                    _consumingSequence++;
+                    continue;
                 }
+                processingCommand = getProcessingCommand(_consumingSequence);
+
+                if (processingCommand != null) {
+                    _messageHandler.handle(processingCommand);
+                }
+                _consumingSequence++;
+                count++;
             }
         } catch (Throwable ex) {
-            hasException = true;
-
-            if (ex instanceof IOException || ex instanceof IORuntimeException) {
-                //We need to retry the command.
-                decreaseConsumingOffset();
-            }
-
-            if (processingMessage != null) {
-                ICommand command = processingMessage.getMessage();
-                _logger.error(String.format("Failed to handle command [id: %s, type: %s]", command.id(), command.getClass().getName()), ex);
-            } else {
-                _logger.error("Failed to run command mailbox.", ex);
+            _logger.error(String.format("Command mailbox run has unknown exception, aggregateRootId: %s, commandId: %s", _aggregateRootId, processingCommand != null ? processingCommand.getMessage().id() : ""), ex);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                //ignore
+                e.printStackTrace();
             }
         } finally {
-            if (hasException || processingMessage == null) {
-                exitHandlingMessage();
-                if (hasRemainningMessage()) {
-                    registerForExecution();
-                }
+            _isProcessingCommand = false;
+            _processingWaitHandle.set();
+            exit();
+            if (_consumingSequence < _nextSequence) {
+                tryRun();
             }
         }
     }
 
-    private void processRequestToCompleteOffsets() {
-        long nextSequence = _consumedOffset + 1;
+    public boolean isInactive(int timeoutSeconds) {
+        return (System.currentTimeMillis() - _lastActiveTime.getTime()) >= timeoutSeconds * 1000l;
+    }
 
-        while (_requestToCompleteOffsetDict.containsKey(nextSequence)) {
+    private ProcessingCommand getProcessingCommand(long sequence) {
+        return _messageDict.get(sequence);
+    }
+
+    private long processNextCompletedCommands(long baseSequence) {
+        long returnSequence = baseSequence;
+        long nextSequence = baseSequence + 1;
+
+        while (_requestToCompleteCommandDict.containsKey(nextSequence)) {
             ProcessingCommand processingCommand = _messageDict.remove(nextSequence);
 
             if (processingCommand != null) {
-                completeMessageWithResult(processingCommand, _requestToCompleteOffsetDict.get(nextSequence));
+                CommandResult commandResult = _requestToCompleteCommandDict.get(nextSequence);
+                completeCommand(processingCommand, commandResult);
             }
-            _requestToCompleteOffsetDict.remove(nextSequence);
-            _consumedOffset = nextSequence;
+            _requestToCompleteCommandDict.remove(nextSequence);
+            returnSequence = nextSequence;
 
             nextSequence++;
         }
+
+        return returnSequence;
     }
 
-    private void completeMessageWithResult(ProcessingCommand processingCommand, CommandResult commandResult) {
+    private void completeCommand(ProcessingCommand processingCommand, CommandResult commandResult) {
         try {
             processingCommand.complete(commandResult);
         } catch (Exception ex) {
@@ -161,28 +192,25 @@ public class ProcessingCommandMailbox {
         }
     }
 
-    private void exitHandlingMessage() {
-//        _isHandlingMessage.compareAndSet(true, false);
-        _isHandlingMessage.getAndSet(false);
+    private void tryRun() {
+        if (tryEnter()) {
+            CompletableFuture.runAsync(this::run);
+        }
     }
 
-    private boolean hasRemainningMessage() {
-        return _consumingOffset < _maxOffset;
+    private boolean tryEnter() {
+        return _isRunning.compareAndSet(false, true);
     }
 
-    private ProcessingCommand getNextMessage() {
-        return _messageDict.get(_consumingOffset);
+    private void exit() {
+        _isRunning.getAndSet(false);
     }
 
-    private void increaseConsumingOffset() {
-        _consumingOffset++;
+    public Date getLastActiveTime() {
+        return _lastActiveTime;
     }
 
-    private void decreaseConsumingOffset() {
-        _consumingOffset--;
-    }
-
-    private void registerForExecution() {
-        _scheduler.scheduleMailbox(this);
+    public boolean isRunning() {
+        return _isRunning.get();
     }
 }

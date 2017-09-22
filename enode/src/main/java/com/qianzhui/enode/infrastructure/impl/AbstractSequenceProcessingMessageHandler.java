@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Created by junbo_xu on 2016/4/5.
  */
-public abstract class AbstractSequenceProcessingMessageHandler<X extends IProcessingMessage<X, Y, Z> & ISequenceProcessingMessage, Y extends ISequenceMessage, Z> implements IProcessingMessageHandler<X, Y, Z> {
+public abstract class AbstractSequenceProcessingMessageHandler<X extends IProcessingMessage<X, Y> & ISequenceProcessingMessage, Y extends ISequenceMessage> implements IProcessingMessageHandler<X, Y> {
     private final IPublishedVersionStore _publishedVersionStore;
     private final IOHelper _ioHelper;
     private final ILogger _logger;
@@ -48,7 +48,7 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                         processingMessage.addToWaitingList();
                     } else {
                         //TODO default(Z)
-                        processingMessage.setResult(null);
+                        processingMessage.complete();
                     }
                 },
                 () -> String.format("sequence message [messageId:%s, messageType:%s, aggregateRootId:%s, aggregateRootVersion:%s]", message.id(), message.getClass().getName(), message.aggregateRootStringId(), message.version()),
@@ -79,7 +79,7 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 result ->
                 {
                     //TODO default(Z)
-                    processingMessage.setResult(null);
+                    processingMessage.complete();
                 },
                 () -> String.format("sequence message [messageId:%s, messageType:%s, aggregateRootId:%s, aggregateRootVersion:%d]", processingMessage.getMessage().id(), processingMessage.getMessage().getClass().getName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
                 errorMessage ->

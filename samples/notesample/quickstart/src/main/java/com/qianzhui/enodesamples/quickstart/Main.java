@@ -47,9 +47,14 @@ public class Main {
         /**============= Enode数据库配置（内存实现不需要配置） ===========*/
         Properties properties = new Properties();
         properties.setProperty("driverClassName", "com.mysql.jdbc.Driver");
-        properties.setProperty("url", "jdbc:mysql://localhost:3306/enode_new");
+        /*properties.setProperty("url", "jdbc:mysql://localhost:3306/enode_new");
         properties.setProperty("username", "root");
+        properties.setProperty("password", "coffee");*/
+
+        properties.setProperty("url", "jdbc:mysql://wwwjishulink.mysql.rds.aliyuncs.com:3306/jishulink_view_dev");
+        properties.setProperty("username", "dev");
         properties.setProperty("password", "coffee");
+
         properties.setProperty("initialSize", "1");
         properties.setProperty("maxTotal", "1");
         BasicDataSource dataSource = BasicDataSourceFactory.createDataSource(properties);

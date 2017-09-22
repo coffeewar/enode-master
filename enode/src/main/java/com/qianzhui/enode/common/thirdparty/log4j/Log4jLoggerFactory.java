@@ -39,7 +39,8 @@ public class Log4jLoggerFactory implements ILoggerFactory {
         }
 
         BasicConfigurator.resetConfiguration();
-        BasicConfigurator.configure(new ConsoleAppender(new PatternLayout("[%d{yyyy/MM/dd HH:mm:ss}]-[%5p]-[%l]-[%t]-[%m]%n")));
+        BasicConfigurator.configure(new ConsoleAppender(new PatternLayout("[%d{yyyy/MM/dd HH:mm:ss}]-[%p]-[%l]-[%t]-[%m]%n")));
+//        BasicConfigurator.configure(new ConsoleAppender(new PatternLayout("%d %p [%c] - <%m> <%t>%n")));
     }
 
     @Override

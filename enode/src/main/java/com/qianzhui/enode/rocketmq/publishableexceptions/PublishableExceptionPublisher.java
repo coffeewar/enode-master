@@ -8,7 +8,10 @@ import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
-import com.qianzhui.enode.infrastructure.*;
+import com.qianzhui.enode.infrastructure.IMessagePublisher;
+import com.qianzhui.enode.infrastructure.IPublishableException;
+import com.qianzhui.enode.infrastructure.ISequenceMessage;
+import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
@@ -56,7 +59,7 @@ public class PublishableExceptionPublisher implements IMessagePublisher<IPublish
 
     public CompletableFuture<AsyncTaskResult> publishAsync(IPublishableException exception) {
         Message message = createEQueueMessage(exception);
-        return _sendMessageService.sendMessageAsync(_producer, message, exception.getRoutingKey() == null ? exception.id() : exception.getRoutingKey());
+        return _sendMessageService.sendMessageAsync(_producer, message, exception.getRoutingKey() == null ? exception.id() : exception.getRoutingKey(), exception.id(), null);
     }
 
     private Message createEQueueMessage(IPublishableException exception) {
@@ -64,7 +67,7 @@ public class PublishableExceptionPublisher implements IMessagePublisher<IPublish
         Map<String, String> serializableInfo = new HashMap<>();
         exception.serializeTo(serializableInfo);
         ISequenceMessage sequenceMessage = null;
-        if(exception instanceof ISequenceMessage){
+        if (exception instanceof ISequenceMessage) {
             sequenceMessage = (ISequenceMessage) exception;
         }
 

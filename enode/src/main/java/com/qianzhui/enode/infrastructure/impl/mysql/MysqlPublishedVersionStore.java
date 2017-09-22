@@ -1,5 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl.mysql;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
@@ -18,6 +19,8 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Created by junbo_xu on 2016/4/3.
@@ -29,6 +32,7 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
     private final String _tableName;
     private final String _uniqueIndexName;
     private final ILogger _logger;
+    private final Executor executor;
 
     public MysqlPublishedVersionStore(DataSource ds, OptionSetting optionSetting) {
         Ensure.notNull(ds, "ds");
@@ -49,6 +53,7 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
         _queryRunner = new QueryRunner(ds);
 
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+        executor = Executors.newFixedThreadPool(4, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("MysqlPublishedVersionStoreExecutor-%d").build());
     }
 
     public CompletableFuture<AsyncTaskResult> updatePublishedVersionAsync(String processorName, String aggregateRootTypeName, String aggregateRootId, int publishedVersion) {
@@ -73,7 +78,7 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
                     _logger.error("Insert aggregate published version has unknown exception.", ex);
                     return new AsyncTaskResult(AsyncTaskStatus.Failed, ex.getMessage());
                 }
-            });
+            }, executor);
         } else {
             return CompletableFuture.supplyAsync(() -> {
                 try {
@@ -93,7 +98,7 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
                     _logger.error("Update aggregate published version has unknown exception.", ex);
                     return new AsyncTaskResult(AsyncTaskStatus.Failed, ex.getMessage());
                 }
-            });
+            }, executor);
         }
     }
 
@@ -113,6 +118,6 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
                 _logger.error("Get aggregate published version has unknown exception.", ex);
                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage());
             }
-        });
+        }, executor);
     }
 }

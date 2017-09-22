@@ -25,17 +25,17 @@ public class ApplicationMessageConsumer {
     private final IJsonSerializer _jsonSerializer;
     private final ITopicProvider<IApplicationMessage> _messageTopicProvider;
     private final ITypeNameProvider _typeNameProvider;
-    private final IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean> _processor;
+    private final IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage> _processor;
     private final ILogger _logger;
 
     @Inject
     public ApplicationMessageConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer,
                                       ITopicProvider<IApplicationMessage> messageITopicProvider, ITypeNameProvider typeNameProvider,
-                                      IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean> processor,
+                                      IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage> processor,
                                       ILoggerFactory loggerFactory) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
-        _messageTopicProvider=messageITopicProvider;
+        _messageTopicProvider = messageITopicProvider;
         _typeNameProvider = typeNameProvider;
         _processor = processor;
         _logger = loggerFactory.create(getClass());
@@ -46,7 +46,7 @@ public class ApplicationMessageConsumer {
         _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
         _messageTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
         });
-        _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         });
         _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
@@ -75,7 +75,7 @@ public class ApplicationMessageConsumer {
         ApplicationDataMessage appDataMessage = _jsonSerializer.deserialize(BitConverter.toString(msg.getBody()), ApplicationDataMessage.class);
         Class applicationMessageType;
 
-        try{
+        try {
             applicationMessageType = _typeNameProvider.getType(appDataMessage.getApplicationMessageType());
         } catch (Exception e) {
             _logger.warn("Consume applicatio message exception:", e);
@@ -86,6 +86,7 @@ public class ApplicationMessageConsumer {
         IApplicationMessage message = (IApplicationMessage) _jsonSerializer.deserialize(appDataMessage.getApplicationMessageData(), applicationMessageType);
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingApplicationMessage processingMessage = new ProcessingApplicationMessage(message, processContext);
+        _logger.info("ENode application message received, messageId: %s, routingKey: %s", message.id(), message.getRoutingKey());
         _processor.process(processingMessage);
 //        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }

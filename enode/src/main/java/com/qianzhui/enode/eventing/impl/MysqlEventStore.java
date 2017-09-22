@@ -1,5 +1,6 @@
 package com.qianzhui.enode.eventing.impl;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.commanding.CommandAddResult;
 import com.qianzhui.enode.common.container.ObjectContainer;
@@ -25,6 +26,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +48,7 @@ public class MysqlEventStore implements IEventStore {
     private final ILogger _logger;
     private final QueryRunner _queryRunner;
     private boolean _supportBatchAppendEvent;
+    private Executor executor;
 
     public MysqlEventStore(DataSource ds, OptionSetting optionSetting) {
         Ensure.notNull(ds, "ds");
@@ -77,6 +81,8 @@ public class MysqlEventStore implements IEventStore {
         _ioHelper = ObjectContainer.resolve(IOHelper.class);
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
         _queryRunner = new QueryRunner(ds);
+        executor = Executors.newFixedThreadPool(4,
+                new ThreadFactoryBuilder().setDaemon(true).setNameFormat("MysqlEventStoreExecutor-%d").build());
     }
 
     public boolean isSupportBatchAppendEvent() {
@@ -132,7 +138,7 @@ public class MysqlEventStore implements IEventStore {
                                 _logger.error(errorMessage, ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage());
                             }
-                        })
+                        }, executor)
                 , "QueryAggregateEventsAsync");
     }
 
@@ -173,7 +179,7 @@ public class MysqlEventStore implements IEventStore {
                                 _logger.error("Batch append event has unknown exception.", ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
                             }
-                        })
+                        }, executor)
                 , "BatchAppendEventsAsync");
 
     }
@@ -206,7 +212,7 @@ public class MysqlEventStore implements IEventStore {
                                 _logger.error(String.format("Append event has unknown exception, eventStream: %s", eventStream), ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
                             }
-                        })
+                        }, executor)
                 , "AppendEventsAsync");
     }
 
@@ -229,7 +235,7 @@ public class MysqlEventStore implements IEventStore {
                                 _logger.error(String.format("Find event by version has unknown exception, aggregateRootId: %s, version: %d", aggregateRootId, version), ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage());
                             }
-                        })
+                        }, executor)
                 , "FindEventByVersionAsync");
     }
 
@@ -252,7 +258,7 @@ public class MysqlEventStore implements IEventStore {
                                 _logger.error(String.format("Find event by commandId has unknown exception, aggregateRootId: %s, commandId: %s", aggregateRootId, commandId), ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage());
                             }
-                        })
+                        }, executor)
                 , "FindEventByCommandIdAsync");
     }
 

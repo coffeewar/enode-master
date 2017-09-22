@@ -27,14 +27,14 @@ public class DomainEventConsumer {
     private final IJsonSerializer _jsonSerializer;
     private final IEventSerializer _eventSerializer;
     private ITypeNameProvider _typeNameProvider;
-    private final IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> _processor;
+    private final IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> _processor;
     private final ILogger _logger;
     private final boolean _sendEventHandledMessage;
     private final ITopicProvider<IDomainEvent> _eventTopicProvider;
 
     @Inject
     public DomainEventConsumer(RocketMQConsumer rocketMQConsumer, IJsonSerializer jsonSerializer, ITypeNameProvider typeNameProvider,
-                               IEventSerializer eventSerializer, IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean> processor,
+                               IEventSerializer eventSerializer, IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> processor,
                                ITopicProvider<IDomainEvent> eventITopicProvider,
                                ILoggerFactory loggerFactory) {
         _consumer = rocketMQConsumer;
@@ -54,7 +54,7 @@ public class DomainEventConsumer {
         _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
         _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
         _eventSerializer = ObjectContainer.resolve(IEventSerializer.class);
-        _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         });
         _logger = ObjectContainer.resolve(ILoggerFactory.class).create(this.getClass());
         _sendEventHandledMessage = sendEventHandledMessage;
@@ -95,6 +95,7 @@ public class DomainEventConsumer {
         DomainEventStreamMessage domainEventStreamMessage = convertToDomainEventStream(message);
         DomainEventStreamProcessContext processContext = new DomainEventStreamProcessContext(this, domainEventStreamMessage, msg, context);
         ProcessingDomainEventStreamMessage processingMessage = new ProcessingDomainEventStreamMessage(domainEventStreamMessage, processContext);
+        _logger.info("ENode event message received, messageId: %s, aggregateRootId: %s, aggregateRootType: %s, version: %d", domainEventStreamMessage.id(), domainEventStreamMessage.aggregateRootStringId(), domainEventStreamMessage.aggregateRootTypeName(), domainEventStreamMessage.version());
         _processor.process(processingMessage);
     }
 
@@ -107,6 +108,7 @@ public class DomainEventConsumer {
                 _eventSerializer.deserialize(message.getEvents(), IDomainEvent.class),
                 message.getItems()
         );
+        domainEventStreamMessage.setId(message.getId());
         domainEventStreamMessage.setTimestamp(message.getTimestamp());
 
         return domainEventStreamMessage;

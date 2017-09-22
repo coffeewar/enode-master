@@ -3,8 +3,8 @@ package com.qianzhui.enode.infrastructure;
 /**
  * Created by junbo_xu on 2016/3/14.
  */
-public interface IProcessingMessage<X extends IProcessingMessage<X,Y,Z>, Y extends IMessage, Z> {
+public interface IProcessingMessage<X extends IProcessingMessage<X,Y>, Y extends IMessage> {
     Y getMessage();
-    void setMailbox(ProcessingMessageMailbox<X, Y, Z> mailbox);
-    void setResult(Z result);
+    void setMailbox(ProcessingMessageMailbox<X, Y> mailbox);
+    void complete();
 }

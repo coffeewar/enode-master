@@ -19,6 +19,10 @@ public class ObjectContainer {
         return current.commitRegisters();
     }
 
+    public static void registerStaticInjection(Class staticInjectionClass){
+        current.registerStaticInjection(staticInjectionClass);
+    }
+
     /*** ========== ioc override operation ========== */
 
     /**

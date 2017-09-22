@@ -11,6 +11,8 @@ public interface ICommandService {
 
     CompletableFuture<AsyncTaskResult> sendAsync(ICommand command);
 
+    CompletableFuture<AsyncTaskResult> sendAsyncAll(ICommand... commands);
+
     void send(ICommand command);
 
     CommandResult execute(ICommand command, int timeoutMillis);

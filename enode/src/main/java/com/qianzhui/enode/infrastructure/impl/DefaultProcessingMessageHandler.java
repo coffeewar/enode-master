@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Created by junbo_xu on 2016/4/5.
  */
-public class DefaultProcessingMessageHandler<X extends IProcessingMessage<X, Y, Z>, Y extends IMessage, Z> implements IProcessingMessageHandler<X, Y, Z> {
+public class DefaultProcessingMessageHandler<X extends IProcessingMessage<X, Y>, Y extends IMessage> implements IProcessingMessageHandler<X, Y> {
     private final IMessageDispatcher _dispatcher;
 
     @Inject
@@ -22,11 +22,8 @@ public class DefaultProcessingMessageHandler<X extends IProcessingMessage<X, Y, 
 
     public void handleAsync(X processingMessage) {
         CompletableFuture<AsyncTaskResult> asyncTaskResultCompletableFuture = _dispatcher.dispatchMessageAsync(processingMessage.getMessage());
-        asyncTaskResultCompletableFuture.thenRun(()->
-            processingMessage.setResult(null)
+        asyncTaskResultCompletableFuture.thenRun(() ->
+                processingMessage.complete()
         );
-        //TODO default(Z)
-        //processingMessage.Complete(default(Z));
-        //processingMessage.setResult(null);
     }
 }

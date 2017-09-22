@@ -11,6 +11,8 @@ import java.util.Properties;
 public interface IObjectContainer {
     boolean commitRegisters();
 
+    void registerStaticInjection(Class staticInjectionClass);
+
     void override(Class implementationType, String serviceName, LifeStyle life);
 
     void override(Class implementationType, String serviceName);

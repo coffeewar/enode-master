@@ -1,8 +1,10 @@
 package com.qianzhui.enode.eventing.impl;
 
+import com.qianzhui.enode.common.logging.ILogger;
 import com.qianzhui.enode.eventing.EventCommittingContext;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
@@ -14,34 +16,49 @@ import java.util.function.Consumer;
  * Created by junbo_xu on 2016/4/23.
  */
 public class EventMailBox {
+    private final ILogger _logger;
     private final String _aggregateRootId;
     private final Queue<EventCommittingContext> _messageQueue;
     private final Consumer<List<EventCommittingContext>> _handleMessageAction;
-    private AtomicBoolean _isHandlingMessage;
+    private AtomicBoolean _isRunning;
     private int _batchSize;
+    private Date _lastActiveTime;
 
     public String getAggregateRootId() {
         return _aggregateRootId;
     }
 
-    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction) {
+    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction, ILogger logger) {
         _aggregateRootId = aggregateRootId;
         _messageQueue = new ConcurrentLinkedQueue<>();
         _batchSize = batchSize;
         _handleMessageAction = handleMessageAction;
-        _isHandlingMessage = new AtomicBoolean(false);
+        _isRunning = new AtomicBoolean(false);
+        _logger = logger;
+        _lastActiveTime = new Date();
     }
 
     public void enqueueMessage(EventCommittingContext message) {
         _messageQueue.add(message);
-        registerForExecution(false);
+        _lastActiveTime = new Date();
+        tryRun(false);
     }
 
-    public void clear() {
-        _messageQueue.clear();
+    public void tryRun() {
+        tryRun(false);
+    }
+
+    public void tryRun(boolean exitFirst) {
+        if (exitFirst) {
+            exit();
+        }
+        if (tryEnter()) {
+            CompletableFuture.runAsync(this::run);
+        }
     }
 
     public void run() {
+        _lastActiveTime = new Date();
         List<EventCommittingContext> contextList = null;
         try {
             EventCommittingContext context = null;
@@ -60,32 +77,48 @@ public class EventMailBox {
             if (contextList != null && contextList.size() > 0) {
                 _handleMessageAction.accept(contextList);
             }
+        } catch (Exception ex) {
+            _logger.error(String.format("Event mailbox run has unknown exception, aggregateRootId: %s", _aggregateRootId), ex);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                //ignore
+                e.printStackTrace();
+            }
         } finally {
             if (contextList == null || contextList.size() == 0) {
-                exitHandlingMessage();
+                exit();
                 if (!_messageQueue.isEmpty()) {
-                    registerForExecution(false);
+                    tryRun();
                 }
             }
         }
     }
 
-    public void exitHandlingMessage() {
+    public void exit() {
 //        _isHandlingMessage.set(false);
 //        _isHandlingMessage.compareAndSet(true, false);
-        _isHandlingMessage.getAndSet(false);
+        _isRunning.getAndSet(false);
     }
 
-    public void registerForExecution(boolean exitFirst) {
-        if (exitFirst) {
-            exitHandlingMessage();
-        }
-        if (enterHandlingMessage()) {
-            CompletableFuture.runAsync(this::run);
-        }
+
+    public void clear() {
+        _messageQueue.clear();
     }
 
-    private boolean enterHandlingMessage() {
-        return _isHandlingMessage.compareAndSet(false, true);
+    public boolean isInactive(int timeoutSeconds) {
+        return (System.currentTimeMillis() - _lastActiveTime.getTime()) >= timeoutSeconds * 1000l;
+    }
+
+    private boolean tryEnter() {
+        return _isRunning.compareAndSet(false, true);
+    }
+
+    public Date getLastActiveTime() {
+        return _lastActiveTime;
+    }
+
+    public boolean isRunning() {
+        return _isRunning.get();
     }
 }

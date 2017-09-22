@@ -26,6 +26,7 @@ import com.qianzhui.enode.infrastructure.impl.*;
 import com.qianzhui.enode.infrastructure.impl.inmemory.InMemoryPublishedVersionStore;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlLockService;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlPublishedVersionStore;
+import com.qianzhui.enode.jmx.ENodeJMXAgent;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQConsumer;
 import com.qianzhui.enode.rocketmq.TopicTagData;
@@ -166,14 +167,12 @@ public class ENode {
         ObjectContainer.register(IAggregateRepositoryProvider.class, DefaultAggregateRepositoryProvider.class);
         ObjectContainer.register(IAggregateRootFactory.class, DefaultAggregateRootFactory.class);
         ObjectContainer.register(IMemoryCache.class, DefaultMemoryCache.class);
-        ObjectContainer.register(ICleanAggregateService.class, DefaultCleanAggregateService.class);
         ObjectContainer.register(IAggregateSnapshotter.class, DefaultAggregateSnapshotter.class);
         ObjectContainer.register(IAggregateStorage.class, EventSourcingAggregateStorage.class);
         ObjectContainer.register(IRepository.class, DefaultRepository.class);
 
         ObjectContainer.register(ICommandAsyncHandlerProvider.class, DefaultCommandAsyncHandlerProvider.class);
         ObjectContainer.register(ICommandHandlerProvider.class, DefaultCommandHandlerProvider.class);
-        ObjectContainer.register(ICommandStore.class, InMemoryCommandStore.class);
         ObjectContainer.register(ICommandRoutingKeyProvider.class, DefaultCommandRoutingKeyProvider.class);
         ObjectContainer.register(ICommandService.class, NotImplementedCommandService.class);
 
@@ -193,37 +192,46 @@ public class ENode {
         }, DoNothingPublisher.class);
 
         ObjectContainer.register(IProcessingCommandHandler.class, DefaultProcessingCommandHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, DomainEventStreamMessageHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
-        ObjectContainer.register(IProcessingCommandScheduler.class, DefaultProcessingCommandScheduler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
+        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
 
         ObjectContainer.register(ICommandProcessor.class, DefaultCommandProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage, Boolean>>() {
-        }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage, Boolean>>() {
-        }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException, Boolean>>() {
-        }, null, LifeStyle.Singleton);
+
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, DefaultApplicationMessageProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, DefaultDomainEventProcessor.class);
+        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, DefaultPublishableExceptionProcessor.class);
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }, null, LifeStyle.Singleton);*/
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }, null, LifeStyle.Singleton);*/
+
+        /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }, null, LifeStyle.Singleton);*/
 
 
 //        _assemblyInitializerServiceTypes.add(ITypeNameProvider.class);
@@ -255,22 +263,12 @@ public class ENode {
 
     public ENode useMysqlComponents(DataSource ds) {
         return useMysqlLockService(ds, null)
-                .useMysqlCommandStore(ds, null)
                 .useMysqlEventStore(ds, null)
                 .useMysqlPublishedVersionStore(ds, null);
     }
 
     public ENode useMysqlLockService(DataSource ds, OptionSetting optionSetting) {
         ObjectContainer.registerInstance(ILockService.class, new MysqlLockService(ds, optionSetting));
-
-        return this;
-    }
-
-    public ENode useMysqlCommandStore(DataSource ds, OptionSetting optionSetting) {
-        //使用Provider注册，延迟MysqlCommandStore初始化，因为初始化时需要调用IOC容器(Guice)，而容器此时可能没有初始化
-        ObjectContainer.register(ICommandStore.class, null, () -> {
-            return new MysqlCommandStore(ds, optionSetting);
-        }, LifeStyle.Singleton);
 
         return this;
     }
@@ -328,9 +326,9 @@ public class ENode {
 
     //TODO endoe component types
     private static final Set<Class> ENODE_COMPONENT_TYPES = new HashSet<Class>() {{
-//        add(ICommandHandler.class);
-//        add(ICommandAsyncHandler.class);
-//        add(IMessageHandler.class);
+        add(ICommandHandler.class);
+        add(ICommandAsyncHandler.class);
+        add(IMessageHandler.class);
         add(IAggregateRepository.class);
         add(ITopicProvider.class);
     }};
@@ -366,6 +364,11 @@ public class ENode {
         }
 
         return ENODE_GENERIC_COMPONENT_TYPES.stream().anyMatch(x -> x.isAssignableFrom(type));
+    }
+
+    public ENode registerStaticInjection(Class staticInjectionClass) {
+        ObjectContainer.registerStaticInjection(staticInjectionClass);
+        return this;
     }
 
     public ENode registerDefaultComponents() {
@@ -524,7 +527,7 @@ public class ENode {
             RocketMQConsumer rocketMQConsumer = ObjectContainer.resolve(RocketMQConsumer.class);
             //topicTagDatas.stream().forEach(topicTagData -> rocketMQConsumer.subscribe(topicTagData.getTopic(), topicTagData.getTag()));
 
-            topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic,tags)->{
+            topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic, tags) -> {
                 String tagsJoin = tags.stream().map(TopicTagData::getTag).collect(Collectors.joining("||"));
                 rocketMQConsumer.subscribe(topic, tagsJoin);
             });
@@ -596,13 +599,42 @@ public class ENode {
 
     public ENode start() {
         commitRegisters();
+        startENodeComponents();
         initializeBusinessAssemblies();
         startRocketMQComponents();
+        ENodeJMXAgent.startAgent();
         System.out.println("ENode started.");
         return this;
     }
 
+    private void startENodeComponents() {
+        ObjectContainer.resolve(IMemoryCache.class).start();
+        ObjectContainer.resolve(ICommandProcessor.class).start();
+        ObjectContainer.resolve(IEventService.class).start();
+
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }).start();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }).start();
+    }
+
+    private void stopENodeComponents() {
+        ObjectContainer.resolve(IMemoryCache.class).stop();
+        ObjectContainer.resolve(ICommandProcessor.class).stop();
+        ObjectContainer.resolve(IEventService.class).stop();
+
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        }).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        }).stop();
+        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        }).stop();
+    }
+
     public void shutdown() {
+        stopENodeComponents();
         //Shutdown MQConsumer and any register consumers(CommandConsumer、DomainEventConsumer、ApplicationMessageConsumer、PublishableExceptionConsumer)
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             //CommandConsumer

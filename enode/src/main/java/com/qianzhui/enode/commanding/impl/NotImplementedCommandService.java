@@ -18,6 +18,11 @@ public class NotImplementedCommandService implements ICommandService {
     }
 
     @Override
+    public CompletableFuture<AsyncTaskResult> sendAsyncAll(ICommand... commands) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void send(ICommand command) {
         throw new UnsupportedOperationException();
     }

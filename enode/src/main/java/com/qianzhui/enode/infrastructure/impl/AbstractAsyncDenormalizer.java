@@ -1,5 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.IORuntimeException;
 import org.apache.commons.dbutils.QueryRunner;
@@ -8,6 +9,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 
 /**
@@ -16,15 +19,18 @@ import java.util.function.Function;
 public abstract class AbstractAsyncDenormalizer {
     protected final DataSource ds;
     protected final QueryRunner _queryRunner;
+    protected final Executor executor;
 
     public AbstractAsyncDenormalizer(DataSource ds) {
         this.ds = ds;
         this._queryRunner = new QueryRunner(ds);
+        executor = Executors.newFixedThreadPool(4, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("AsyncDenormalizerExecutor-%d").build());
     }
 
     public CompletableFuture<AsyncTaskResult> tryExecuteAsync(Function<QueryRunner, AsyncTaskResult> executer) {
         return CompletableFuture.supplyAsync(() ->
-                executer.apply(_queryRunner)
+                executer.apply(_queryRunner),
+                executor
         );
     }
 
@@ -39,7 +45,11 @@ public abstract class AbstractAsyncDenormalizer {
                 }
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
+    }
+
+    public CompletableFuture<AsyncTaskResult> tryInsertRecordAsync(InsertExecuter insertExecuter) {
+        return tryInsertRecordAsync(insertExecuter.getSql(), insertExecuter.getParams());
     }
 
     public CompletableFuture<AsyncTaskResult> tryUpdateRecordAsync(String sql, Object... params) {
@@ -50,7 +60,11 @@ public abstract class AbstractAsyncDenormalizer {
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
+    }
+
+    public CompletableFuture<AsyncTaskResult> tryUpdateRecordAsync(UpdateExecuter updateExecuter) {
+        return tryUpdateRecordAsync(updateExecuter.getSql(), updateExecuter.getParams());
     }
 
     public CompletableFuture<AsyncTaskResult> tryTransactionAsync(QueryRunnerExecuter... executers) {
@@ -74,14 +88,14 @@ public abstract class AbstractAsyncDenormalizer {
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
             }
-        });
+        }, executor);
     }
 
-    protected QueryRunnerExecuter insertStatement(String sql, Object... params) {
+    protected InsertExecuter insertStatement(String sql, Object... params) {
         return new InsertExecuter(sql, params);
     }
 
-    protected QueryRunnerExecuter updateStatement(String sql, Object... params) {
+    protected UpdateExecuter updateStatement(String sql, Object... params) {
         return new UpdateExecuter(sql, params);
     }
 
@@ -124,14 +138,14 @@ public abstract class AbstractAsyncDenormalizer {
         }
     }
 
-    static class UpdateExecuter extends AbstractQueryRunnerExecuter {
+    public static class UpdateExecuter extends AbstractQueryRunnerExecuter {
 
         public UpdateExecuter(String sql, Object[] params) {
             super(sql, params);
         }
     }
 
-    static class InsertExecuter extends AbstractQueryRunnerExecuter {
+    public static class InsertExecuter extends AbstractQueryRunnerExecuter {
         public InsertExecuter(String sql, Object[] params) {
             super(sql, params);
         }

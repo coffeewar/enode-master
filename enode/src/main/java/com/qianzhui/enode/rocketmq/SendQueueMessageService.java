@@ -29,42 +29,42 @@ public class SendQueueMessageService {
         ioHelper = ObjectContainer.resolve(IOHelper.class);
     }
 
-    public void sendMessage(Producer producer, Message message, String routingKey) {
+    public void sendMessage(Producer producer, Message message, String routingKey, String messageId, String version) {
         try {
             ioHelper.tryIOAction(() ->
             {
                 SendResult result = producer.send(message, this::messageQueueSelect, routingKey);
 
                 if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
-                    logger.error("RocketMQ message synch send failed, sendResult: %s, routingKey: %s", result, routingKey);
+                    logger.error("ENode message sync send failed, sendResult: %s, routingKey: %s, messageId: %s, version: %s", result, routingKey, messageId, version);
                     throw new IORuntimeException(result.toString());
                 }
-                logger.info("RocketMQ message synch send success, sendResult: %s, routingKey: %s", result, routingKey);
-            }, "SendQueueMessage");
+                logger.info("ENode message sync send success, sendResult: %s, routingKey: %s, messageId: %s, version: %s", result, routingKey, messageId, version);
+            }, "SendENodeMessage");
         } catch (Exception ex) {
-            logger.error(String.format("RocketMQ message synch send has exception, message: %s, routingKey: %s", message, routingKey), ex);
+            logger.error(String.format("ENode message synch send has exception, message: %s, routingKey: %s, messageId: %s, version: %s", message, routingKey, messageId, version), ex);
             throw ex;
         }
     }
 
-    public CompletableFuture<AsyncTaskResult> sendMessageAsync(Producer producer, Message message, String routingKey) {
+    public CompletableFuture<AsyncTaskResult> sendMessageAsync(Producer producer, Message message, String routingKey, String messageId, String version) {
         CompletableFuture<AsyncTaskResult> promise = new CompletableFuture<>();
         try {
             producer.send(message, this::messageQueueSelect, routingKey, new SendCallback() {
                 @Override
                 public void onSuccess(SendResult sendResult) {
-                    logger.info("RocketMQ message async send success, sendResult: %s, routingKey: %s", sendResult, routingKey);
+                    logger.info("ENode message async send success, sendResult: %s, routingKey: %s, messageId: %s, version: %s", sendResult, routingKey, messageId, version);
                     promise.complete(AsyncTaskResult.Success);
                 }
 
                 @Override
                 public void onException(Throwable ex) {
-                    logger.error(String.format("RocketMQ message async send has exception, message: %s, routingKey: %s", message, routingKey), ex);
+                    logger.error("ENode message async send failed, routingKey: %s, messageId: %s, version: %s", routingKey, messageId, version);
                     promise.complete(new AsyncTaskResult(AsyncTaskStatus.IOException, ex.getMessage()));
                 }
             });
         } catch (Exception ex) {
-            logger.error(String.format("RocketMQ message async send has exception, message: %s, routingKey: %s", message, routingKey), ex);
+            logger.error(String.format("ENode message async send has exception, message: %s, routingKey: %s, messageId: %s, version: %s", message, routingKey, messageId, version), ex);
             promise.complete(new AsyncTaskResult(AsyncTaskStatus.IOException, ex.getMessage()));
         }
 

@@ -10,7 +10,7 @@ import java.lang.reflect.Method;
 /**
  * Created by junbo_xu on 2016/3/31.
  */
-public class DefaultMessageHandlerProvider extends AbstractHandlerProvider<Class,IMessageHandlerProxy1,Class> implements IMessageHandlerProvider {
+public class DefaultMessageHandlerProvider extends AbstractHandlerProvider<Class, IMessageHandlerProxy1, Class> implements IMessageHandlerProvider {
     @Override
     protected Class getHandlerType() {
         return IMessageHandler.class;
@@ -29,11 +29,6 @@ public class DefaultMessageHandlerProvider extends AbstractHandlerProvider<Class
     @Override
     protected boolean isHandlerSourceMatchKey(Class handlerSource, Class key) {
         return key.isAssignableFrom(handlerSource);
-    }
-
-    @Override
-    protected boolean isHandleMethodMatchKey(Class[] argumentTypes, Class key) {
-        return argumentTypes.length == 1 && argumentTypes[0] == key;
     }
 
     @Override
