@@ -1,6 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.infrastructure.IApplicationMessage;
 import com.qianzhui.enode.infrastructure.IProcessingMessageHandler;
 import com.qianzhui.enode.infrastructure.IProcessingMessageScheduler;
@@ -18,8 +18,8 @@ public class DefaultApplicationMessageProcessor extends DefaultMessageProcessor<
     public DefaultApplicationMessageProcessor(
             IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage> processingMessageScheduler,
             IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage> processingMessageHandler,
-            ILoggerFactory loggerFactory) {
-        super(processingMessageScheduler, processingMessageHandler, loggerFactory);
+            IScheduleService scheduleService) {
+        super(processingMessageScheduler, processingMessageHandler, scheduleService);
     }
 
     @Override

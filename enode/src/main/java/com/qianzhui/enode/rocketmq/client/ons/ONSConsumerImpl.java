@@ -1,17 +1,16 @@
 package com.qianzhui.enode.rocketmq.client.ons;
 
 import com.alibaba.rocketmq.common.protocol.heartbeat.MessageModel;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
 import com.qianzhui.enode.rocketmq.client.AbstractConsumer;
 import com.qianzhui.enode.rocketmq.client.Consumer;
 import com.qianzhui.enode.rocketmq.client.MQClientInitializer;
 import com.qianzhui.enode.rocketmq.client.RocketMQClientException;
 import com.qianzhui.enode.rocketmq.trace.core.common.OnsTraceConstants;
-import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 import com.qianzhui.enode.rocketmq.trace.core.dispatch.impl.AsyncArrayDispatcher;
 import com.qianzhui.enode.rocketmq.trace.core.utils.OnsConsumeMessageHookImpl;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
 
 import java.util.Properties;
 
@@ -19,7 +18,7 @@ import java.util.Properties;
  * Created by junbo_xu on 2016/4/20.
  */
 public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
-    private static final Log log = LogFactory.getLog(ONSConsumerImpl.class);
+    private static final Logger logger = ENodeLogger.getLog();
 
     public ONSConsumerImpl(Properties properties) {
         super(properties, new ONSClientInitializer());
@@ -58,17 +57,17 @@ public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
             Properties tempProperties = new Properties();
             tempProperties.put(OnsTraceConstants.AccessKey, sessionCredentials.getAccessKey());
             tempProperties.put(OnsTraceConstants.SecretKey, sessionCredentials.getSecretKey());
-            tempProperties.put(OnsTraceConstants.MaxMsgSize,"128000");
-            tempProperties.put(OnsTraceConstants.AsyncBufferSize,"2048");
+            tempProperties.put(OnsTraceConstants.MaxMsgSize, "128000");
+            tempProperties.put(OnsTraceConstants.AsyncBufferSize, "2048");
             tempProperties.put(OnsTraceConstants.MaxBatchNum, "100");
-            tempProperties.put(OnsTraceConstants.NAMESRV_ADDR,mqClientInitializer.getNameServerAddr());
-            tempProperties.put(OnsTraceConstants.InstanceName,mqClientInitializer.buildIntanceName());
-            traceDispatcher=new AsyncArrayDispatcher(tempProperties);
-            traceDispatcher.start(null,defaultMQPushConsumer.getInstanceName());
+            tempProperties.put(OnsTraceConstants.NAMESRV_ADDR, mqClientInitializer.getNameServerAddr());
+            tempProperties.put(OnsTraceConstants.InstanceName, mqClientInitializer.buildIntanceName());
+            traceDispatcher = new AsyncArrayDispatcher(tempProperties);
+            traceDispatcher.start(null, defaultMQPushConsumer.getInstanceName());
             defaultMQPushConsumer.getDefaultMQPushConsumerImpl().registerConsumeMessageHook(
                     new OnsConsumeMessageHookImpl(traceDispatcher));
         } catch (Throwable e) {
-            log.error("system mqtrace hook init failed ,maybe can't send msg trace data");
+            logger.error("system mqtrace hook init failed ,maybe can't send msg trace data");
         }
 
         return defaultMQPushConsumer;

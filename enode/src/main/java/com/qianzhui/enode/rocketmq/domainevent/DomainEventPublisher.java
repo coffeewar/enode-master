@@ -1,11 +1,7 @@
 package com.qianzhui.enode.rocketmq.domainevent;
 
 import com.alibaba.rocketmq.common.message.Message;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.common.utilities.Ensure;
@@ -31,21 +27,22 @@ public class DomainEventPublisher implements IMessagePublisher<DomainEventStream
     private final IEventSerializer _eventSerializer;
     private final Producer _producer;
     private final SendQueueMessageService _sendMessageService;
-    private final ILogger _logger;
 
     public Producer getProducer() {
         return _producer;
     }
 
     @Inject
-    public DomainEventPublisher(Producer producer) {
+    public DomainEventPublisher(Producer producer, IJsonSerializer jsonSerializer,
+                                ITopicProvider<IDomainEvent> eventTopicProvider,
+                                IEventSerializer eventSerializer,
+                                SendQueueMessageService sendQueueMessageService) {
         _producer = producer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _eventTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IDomainEvent>>() {
-        });
-        _eventSerializer = ObjectContainer.resolve(IEventSerializer.class);
-        _sendMessageService = new SendQueueMessageService();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+        _jsonSerializer = jsonSerializer;
+        _eventTopicProvider = eventTopicProvider;
+        _eventSerializer = eventSerializer;
+
+        _sendMessageService = sendQueueMessageService;
     }
 
     public DomainEventPublisher start() {

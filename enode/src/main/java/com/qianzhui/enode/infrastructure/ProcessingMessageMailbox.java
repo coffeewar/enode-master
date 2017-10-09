@@ -1,6 +1,7 @@
 package com.qianzhui.enode.infrastructure;
 
-import com.qianzhui.enode.common.logging.ILogger;
+import com.qianzhui.enode.common.logging.ENodeLogger;
+import org.slf4j.Logger;
 
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,8 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by junbo_xu on 2016/3/14.
  */
 public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y extends IMessage> {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final String _routingKey;
-    private final ILogger _logger;
     private ConcurrentMap<Integer, X> _waitingMessageDict;
     private final ConcurrentLinkedQueue<X> _messageQueue;
     private final IProcessingMessageScheduler<X, Y> _scheduler;
@@ -22,12 +24,11 @@ public class ProcessingMessageMailbox<X extends IProcessingMessage<X, Y>, Y exte
     private final Object _lockObj = new Object();
     private Date _lastActiveTime;
 
-    public ProcessingMessageMailbox(String routingKey, IProcessingMessageScheduler<X, Y> scheduler, IProcessingMessageHandler<X, Y> messageHandler, ILogger logger) {
+    public ProcessingMessageMailbox(String routingKey, IProcessingMessageScheduler<X, Y> scheduler, IProcessingMessageHandler<X, Y> messageHandler) {
         _routingKey = routingKey;
         _messageQueue = new ConcurrentLinkedQueue<>();
         _scheduler = scheduler;
         _messageHandler = messageHandler;
-        _logger = logger;
         _lastActiveTime = new Date();
     }
 

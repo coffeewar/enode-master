@@ -1,6 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.infrastructure.IMessage;
 import com.qianzhui.enode.infrastructure.IMessageHandler;
@@ -14,12 +14,14 @@ import java.util.concurrent.CompletableFuture;
  * Created by junbo_xu on 2016/3/31.
  */
 public class MessageHandlerProxy1 implements IMessageHandlerProxy1 {
+    private IObjectContainer _objectContainer;
     private Class _handlerType;
     private IMessageHandler _handler;
     private MethodHandle _methodHandle;
     private Method _method;
 
-    public MessageHandlerProxy1(Class handlerType, IMessageHandler handler, MethodHandle methodHandle, Method method) {
+    public MessageHandlerProxy1(IObjectContainer objectContainer, Class handlerType, IMessageHandler handler, MethodHandle methodHandle, Method method) {
+        _objectContainer = objectContainer;
         _handlerType = handlerType;
         _handler = handler;
         _methodHandle = methodHandle;
@@ -38,10 +40,10 @@ public class MessageHandlerProxy1 implements IMessageHandlerProxy1 {
 
     @Override
     public Object getInnerObject() {
-        if(_handler != null)
+        if (_handler != null)
             return _handler;
 
-        return ObjectContainer.resolve(_handlerType);
+        return _objectContainer.resolve(_handlerType);
     }
 
     @Override

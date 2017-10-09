@@ -4,9 +4,9 @@ import com.qianzhui.enode.common.function.Action2;
 import com.qianzhui.enode.common.function.Action4;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.IOHelper;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.infrastructure.*;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 import java.util.ArrayList;
@@ -22,12 +22,13 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/4/3.
  */
 public class DefaultMessageDispatcher implements IMessageDispatcher {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final ITypeNameProvider _typeNameProvider;
     private final IMessageHandlerProvider _handlerProvider;
     private final ITwoMessageHandlerProvider _twoMessageHandlerProvider;
     private final IThreeMessageHandlerProvider _threeMessageHandlerProvider;
     private final IOHelper _ioHelper;
-    private final ILogger _logger;
 
     @Inject
     public DefaultMessageDispatcher(
@@ -35,14 +36,12 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
             IMessageHandlerProvider handlerProvider,
             ITwoMessageHandlerProvider twoMessageHandlerProvider,
             IThreeMessageHandlerProvider threeMessageHandlerProvider,
-            IOHelper ioHelper,
-            ILoggerFactory loggerFactory) {
+            IOHelper ioHelper) {
         _typeNameProvider = typeNameProvider;
         _handlerProvider = handlerProvider;
         _twoMessageHandlerProvider = twoMessageHandlerProvider;
         _threeMessageHandlerProvider = threeMessageHandlerProvider;
         _ioHelper = ioHelper;
-        _logger = loggerFactory.create(getClass());
     }
 
     public CompletableFuture<AsyncTaskResult> dispatchMessageAsync(IMessage message) {
@@ -168,13 +167,11 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                     if (queueHandler != null) {
                         queueHandler.onHandlerFinished(handlerProxy);
                     }
-                    if (_logger.isDebugEnabled()) {
-                        _logger.debug("Message handled success, handlerType:%s, messageType:%s, messageId:%s", handlerTypeName, message.getClass().getName(), message.id());
-                    }
+                    _logger.debug("Message handled success, handlerType:{}, messageType:{}, messageId:{}", handlerTypeName, message.getClass().getName(), message.id());
                 },
                 () -> String.format("[messageId:%s, messageType:%s, handlerType:%s]", message.id(), message.getClass().getName(), handlerProxy.getInnerObject().getClass().getName()),
                 errorMessage ->
-                        _logger.fatal(String.format("Handle single message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
+                        _logger.error(String.format("Handle single message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
                 retryTimes, true);
     }
@@ -193,13 +190,11 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                     if (queueHandler != null) {
                         queueHandler.onHandlerFinished(handlerProxy);
                     }
-                    if (_logger.isDebugEnabled()) {
-                        _logger.debug("TwoMessage handled success, [messages:%s], handlerType:%s]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerTypeName);
-                    }
+                    _logger.debug("TwoMessage handled success, [messages:{}], handlerType:{}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerTypeName);
                 },
                 () -> String.format("[messages:%s, handlerType:%s]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerProxy.getInnerObject().getClass().getName()),
                 errorMessage ->
-                        _logger.fatal(String.format("Handle two message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
+                        _logger.error(String.format("Handle two message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
                 retryTimes, true);
     }
@@ -219,13 +214,11 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                     if (queueHandler != null) {
                         queueHandler.onHandlerFinished(handlerProxy);
                     }
-                    if (_logger.isDebugEnabled()) {
 
-                        _logger.debug("ThreeMessage handled success, [messages:%s, handlerType:{1}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerTypeName);
-                    }
+                    _logger.debug("ThreeMessage handled success, [messages:{}, handlerType:{}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerTypeName);
                 },
                 () -> String.format("[messages:%s, handlerType:{1}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerProxy.getInnerObject().getClass().getName()),
-                errorMessage -> _logger.fatal(String.format("Handle three message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
+                errorMessage -> _logger.error(String.format("Handle three message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true);
     }
 

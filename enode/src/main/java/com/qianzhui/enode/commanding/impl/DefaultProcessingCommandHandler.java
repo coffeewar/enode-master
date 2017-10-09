@@ -5,13 +5,13 @@ import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
 import com.qianzhui.enode.common.io.IOHelper;
 import com.qianzhui.enode.common.io.IORuntimeException;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.domain.IAggregateRoot;
 import com.qianzhui.enode.domain.IMemoryCache;
 import com.qianzhui.enode.eventing.*;
 import com.qianzhui.enode.infrastructure.*;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/3/19.
  */
 public class DefaultProcessingCommandHandler implements IProcessingCommandHandler {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private IJsonSerializer _jsonSerializer;
     private IEventStore _eventStore;
     private ICommandHandlerProvider _commandHandlerProvider;
@@ -33,7 +35,6 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     private IMessagePublisher<IPublishableException> _exceptionPublisher;
     private IMemoryCache _memoryCache;
     private IOHelper _ioHelper;
-    private ILogger _logger;
 
     @Inject
     public DefaultProcessingCommandHandler(
@@ -46,8 +47,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
             IMessagePublisher<IApplicationMessage> applicationMessagePublisher,
             IMessagePublisher<IPublishableException> exceptionPublisher,
             IMemoryCache memoryCache,
-            IOHelper ioHelper,
-            ILoggerFactory loggerFactory) {
+            IOHelper ioHelper) {
         _jsonSerializer = jsonSerializer;
         _eventStore = eventStore;
         _commandHandlerProvider = commandHandlerProvider;
@@ -58,7 +58,6 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         _exceptionPublisher = exceptionPublisher;
         _memoryCache = memoryCache;
         _ioHelper = ioHelper;
-        _logger = loggerFactory.create(getClass().getName());
         _eventService.setProcessingCommandHandler(this);
     }
 
@@ -77,10 +76,10 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         if (findResult.getFindStatus() == HandlerFindStatus.Found) {
             handleCommand(processingCommand, findResult.getFindHandler());
         } else if (findResult.getFindStatus() == HandlerFindStatus.TooManyHandlerData) {
-            _logger.error("Found more than one command handler data, commandType:%s, commandId:%s", command.getClass().getName(), command.id());
+            _logger.error("Found more than one command handler data, commandType:{}, commandId:{}", command.getClass().getName(), command.id());
             completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), "More than one command handler data found.");
         } else if (findResult.getFindStatus() == HandlerFindStatus.TooManyHandler) {
-            _logger.error("Found more than one command handler, commandType:%s, commandId:%s", command.getClass().getName(), command.id());
+            _logger.error("Found more than one command handler, commandType:{}, commandId:{}", command.getClass().getName(), command.id());
             completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), "More than one command handler found.");
         } else if (findResult.getFindStatus() == HandlerFindStatus.NotFound) {
             HandlerFindResult<ICommandAsyncHandlerProxy> asyncFindResult = getCommandHandler(processingCommand, commandType -> _commandAsyncHandlerProvider.getHandlers(commandType));
@@ -88,10 +87,10 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
             if (asyncFindResult.getFindStatus() == HandlerFindStatus.Found) {
                 handleCommand(processingCommand, commandAsyncHandler);
             } else if (asyncFindResult.getFindStatus() == HandlerFindStatus.TooManyHandlerData) {
-                _logger.error("Found more than one command async handler data, commandType:%s, commandId:%s", command.getClass().getName(), command.id());
+                _logger.error("Found more than one command async handler data, commandType:{}, commandId:{}", command.getClass().getName(), command.id());
                 completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), "More than one command async handler data found.");
             } else if (asyncFindResult.getFindStatus() == HandlerFindStatus.TooManyHandler) {
-                _logger.error("Found more than one command async handler, commandType:%s, commandId:%s", command.getClass().getName(), command.id());
+                _logger.error("Found more than one command async handler, commandType:{}, commandId:{}", command.getClass().getName(), command.id());
                 completeCommand(processingCommand, CommandStatus.Failed, String.class.getName(), "More than one command async handler found.");
             } else if (asyncFindResult.getFindStatus() == HandlerFindStatus.NotFound) {
                 String errorMessage = String.format("No command handler found of command. commandType:%s, commandId:%s", command.getClass().getName(), command.id());
@@ -110,13 +109,11 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         boolean handleSuccess;
         try {
             commandHandler.handle(processingCommand.getCommandExecuteContext(), command);
-            if (_logger.isDebugEnabled()) {
-                _logger.debug("Handle command success. handlerType:%s, commandType:%s, commandId:%s, aggregateRootId:%s",
-                        commandHandler.getInnerObject().getClass().getName(),
-                        command.getClass().getName(),
-                        command.id(),
-                        command.getAggregateRootId());
-            }
+            _logger.debug("Handle command success. handlerType:{}, commandType:{}, commandId:{}, aggregateRootId:{}",
+                    commandHandler.getInnerObject().getClass().getName(),
+                    command.getClass().getName(),
+                    command.id(),
+                    command.getAggregateRootId());
             handleSuccess = true;
         } catch (Exception ex) {
             handleExceptionAsync(processingCommand, commandHandler, ex, 0);
@@ -224,7 +221,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                     }
                 },
                 () -> String.format("[commandId:%s]", command.id()),
-                errorMessage -> _logger.fatal(String.format("Find event by commandId has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
+                errorMessage -> _logger.error(String.format("Find event by commandId has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true, 3, 1000
         );
 
@@ -245,7 +242,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                     String exceptionInfo = String.join(",", serializableInfo.entrySet().stream().map(x -> String.format("%s:%s", x.getKey(), x.getValue())).collect(Collectors.toList()));
                     return String.format("[commandId:%s, exceptionInfo:%s]", processingCommand.getMessage().id(), exceptionInfo);
                 },
-                errorMessage -> _logger.fatal(String.format("Publish event has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
+                errorMessage -> _logger.error(String.format("Publish event has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true, 3, 1000);
     }
 
@@ -298,13 +295,11 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                 {
                     try {
                         CompletableFuture<AsyncTaskResult<IApplicationMessage>> asyncResult = commandHandler.handleAsync(command);
-                        if (_logger.isDebugEnabled()) {
-                            _logger.debug("Handle command async success. handlerType:%s, commandType:%s, commandId:%s, aggregateRootId:%s",
-                                    commandHandler.getInnerObject().getClass().getName(),
-                                    command.getClass().getName(),
-                                    command.id(),
-                                    command.getAggregateRootId());
-                        }
+                        _logger.debug("Handle command async success. handlerType:{}, commandType:{}, commandId:{}, aggregateRootId:{}",
+                                commandHandler.getInnerObject().getClass().getName(),
+                                command.getClass().getName(),
+                                command.id(),
+                                command.getAggregateRootId());
                         return asyncResult;
                     } catch (IORuntimeException ex) {
                         _logger.error(String.format("Handle command async has io exception. handlerType:%s, commandType:%s, commandId:%s, aggregateRootId:%s",
@@ -350,7 +345,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                 currentRetryTimes -> publishMessageAsync(processingCommand, message, currentRetryTimes),
                 result -> completeCommand(processingCommand, CommandStatus.Success, message.getTypeName(), _jsonSerializer.serialize(message)),
                 () -> String.format("[application message:[id:%s,type:%s],command:[id:%s,type:%s]]", message.id(), message.getClass().getName(), command.id(), command.getClass().getName()),
-                errorMessage -> _logger.fatal(String.format("Publish application message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
+                errorMessage -> _logger.error(String.format("Publish application message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
                 retryTimes, true, 3, 1000);
     }
 

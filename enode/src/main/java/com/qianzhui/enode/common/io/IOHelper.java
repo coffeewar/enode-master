@@ -1,11 +1,10 @@
 package com.qianzhui.enode.common.io;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.function.*;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.utilities.Ensure;
 import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -16,11 +15,7 @@ import java.util.concurrent.CompletableFuture;
  * Created by junbo_xu on 2016/3/2.
  */
 public class IOHelper {
-    private ILogger logger;
-
-    public IOHelper() {
-        logger = ObjectContainer.resolve(ILoggerFactory.class).create(IOHelper.class);
-    }
+    private static final Logger logger = ENodeLogger.getLog();
 
     public void tryIOAction(String actionName, Func<String> getContextInfo, Action action, int maxRetryTimes) {
         tryIOAction(actionName, getContextInfo, action, maxRetryTimes, false, 1000);
@@ -152,7 +147,7 @@ public class IOHelper {
         try {
             if (ex != null) {
                 if(ex instanceof CancellationException) {
-                    logger.error("Async task '%s' was cancelled, contextInfo:%s, current retryTimes:%d.",
+                    logger.error("Async task '{}' was cancelled, contextInfo:{}, current retryTimes:{}.",
                             context.getAsyncActionName(),
                             getContextInfo(context.getContextInfoFunc()),
                             context.getRetryTimes());
@@ -178,7 +173,7 @@ public class IOHelper {
             }
 
             if (result == null) {
-                logger.error("Async task '%s' result is null, contextInfo:%s, current retryTimes:%d",
+                logger.error("Async task '{}' result is null, contextInfo:{}, current retryTimes:{}",
                         context.getAsyncActionName(),
                         getContextInfo(context.getContextInfoFunc()),
                         context.getRetryTimes());
@@ -205,7 +200,7 @@ public class IOHelper {
                     context.getSuccessAction().apply(result);
                 }
             } else if (result.getStatus().equals(AsyncTaskStatus.IOException)) {
-                logger.error("Async task '%s' result status is io exception, contextInfo:%s, current retryTimes:%d, errorMsg:%s, try to run the async task again.",
+                logger.error("Async task '{}' result status is io exception, contextInfo:{}, current retryTimes:{}, errorMsg:{}, try to run the async task again.",
                         context.getAsyncActionName(),
                         getContextInfo(context.getContextInfoFunc()),
                         context.getRetryTimes(),
@@ -218,7 +213,7 @@ public class IOHelper {
                         context.getMaxRetryTimes(),
                         context.getRetryInterval());
             } else if (result.getStatus().equals(AsyncTaskStatus.Failed)) {
-                logger.error("Async task '%s' failed, contextInfo:%s, current retryTimes:%d, errorMsg:%s",
+                logger.error("Async task '{}' failed, contextInfo:{}, current retryTimes:{}, errorMsg:{}",
                         context.getAsyncActionName(),
                         getContextInfo(context.getContextInfoFunc()),
                         context.getRetryTimes(),

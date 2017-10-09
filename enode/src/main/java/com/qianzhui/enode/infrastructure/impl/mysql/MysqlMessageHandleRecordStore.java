@@ -1,10 +1,8 @@
 package com.qianzhui.enode.infrastructure.impl.mysql;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.utilities.Ensure;
 import com.qianzhui.enode.configurations.OptionSetting;
 import com.qianzhui.enode.infrastructure.IMessageHandleRecordStore;
@@ -12,8 +10,8 @@ import com.qianzhui.enode.infrastructure.MessageHandleRecord;
 import com.qianzhui.enode.infrastructure.ThreeMessageHandleRecord;
 import com.qianzhui.enode.infrastructure.TwoMessageHandleRecord;
 import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
+import org.slf4j.Logger;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -24,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore {
 
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final QueryRunner _queryRunner;
     private final String _oneMessageTableName;
     private final String _oneMessageTableUniqueIndexName;
@@ -31,7 +31,6 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
     private final String _twoMessageTableUniqueIndexName;
     private final String _threeMessageTableName;
     private final String _threeMessageTableUniqueIndexName;
-    private final ILogger _logger;
 
     public MysqlMessageHandleRecordStore(DataSource ds, OptionSetting optionSetting) {
         Ensure.notNull(ds, "ds");
@@ -51,8 +50,6 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
         Ensure.notNull(_twoMessageTableUniqueIndexName, "_twoMessageTableUniqueIndexName");
         Ensure.notNull(_threeMessageTableName, "_threeMessageTableName");
         Ensure.notNull(_threeMessageTableUniqueIndexName, "_threeMessageTableUniqueIndexName");
-
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
     }
 
     public CompletableFuture<AsyncTaskResult> addRecordAsync(MessageHandleRecord record) {
@@ -69,7 +66,7 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
 
                 return AsyncTaskResult.Success;
             } catch (SQLException ex) {
-                if(ex.getErrorCode() == 1062 && ex.getMessage().contains(_oneMessageTableUniqueIndexName)){
+                if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_oneMessageTableUniqueIndexName)) {
                     return AsyncTaskResult.Success;
                 }
                 _logger.error("Insert message handle record has sql exception.", ex);
@@ -97,7 +94,7 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
 
                 return AsyncTaskResult.Success;
             } catch (SQLException ex) {
-                if(ex.getErrorCode() == 1062 && ex.getMessage().contains(_twoMessageTableUniqueIndexName)){
+                if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_twoMessageTableUniqueIndexName)) {
                     return AsyncTaskResult.Success;
                 }
                 _logger.error("Insert two-message handle record has sql exception.", ex);
@@ -127,7 +124,7 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
 
                 return AsyncTaskResult.Success;
             } catch (SQLException ex) {
-                if(ex.getErrorCode() == 1062 && ex.getMessage().contains(_threeMessageTableUniqueIndexName)){
+                if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_threeMessageTableUniqueIndexName)) {
                     return AsyncTaskResult.Success;
                 }
                 _logger.error("Insert three-message handle record has sql exception.", ex);
@@ -142,11 +139,11 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
     public CompletableFuture<AsyncTaskResult<Boolean>> isRecordExistAsync(String messageId, String handlerTypeName, String aggregateRootTypeName) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                Object countObj = (int)(long)_queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE MessageId=? AND HandlerTypeName=?", _oneMessageTableName),
+                Object countObj = (int) (long) _queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE MessageId=? AND HandlerTypeName=?", _oneMessageTableName),
                         new ScalarHandler<>(),
                         messageId, handlerTypeName);
 
-                int count = (countObj == null ? 0 :  ((Number) countObj).intValue());
+                int count = (countObj == null ? 0 : ((Number) countObj).intValue());
 
                 return new AsyncTaskResult<>(AsyncTaskStatus.Success, count > 0);
             } catch (SQLException ex) {
@@ -184,7 +181,7 @@ public class MysqlMessageHandleRecordStore implements IMessageHandleRecordStore 
     public CompletableFuture<AsyncTaskResult<Boolean>> isRecordExistAsync(String messageId1, String messageId2, String messageId3, String handlerTypeName, String aggregateRootTypeName) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                Object countObj = (int)(long)_queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE MessageId1=? AND MessageId2=? AND MessageId3=? AND HandlerTypeName=?", _threeMessageTableName),
+                Object countObj = (int) (long) _queryRunner.query(String.format("SELECT COUNT(*) FROM %s WHERE MessageId1=? AND MessageId2=? AND MessageId3=? AND HandlerTypeName=?", _threeMessageTableName),
                         new ScalarHandler<>(),
                         messageId1,
                         messageId2,

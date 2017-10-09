@@ -1,9 +1,7 @@
 package com.qianzhui.enode.common.socketing;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.function.Action2;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.threading.ManualResetEvent;
 import com.qianzhui.enode.common.utilities.Ensure;
 import io.netty.bootstrap.Bootstrap;
@@ -16,11 +14,11 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import org.slf4j.Logger;
 
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,13 +27,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ClientSocket {
 
+    private static final Logger logger = ENodeLogger.getLog();
+
     private final SocketAddress serverEndPoint;
     private SocketAddress localEndPoint;
     private final Bootstrap bootstrap;
     private final NettyClientConfig nettyClientConfig;
     private final Action2<ChannelHandlerContext, byte[]> messageArrivedHandler;
     private final EventLoopGroup eventLoopGroupWorker;
-    private final ILogger logger;
     private DefaultEventExecutorGroup defaultEventExecutorGroup;
     private List<IConnectionEventListener> connectionEventListeners;
     private ManualResetEvent waitConnectHandle;
@@ -54,7 +53,6 @@ public class ClientSocket {
 
         this.nettyClientConfig = nettyClientConfig;
         this.messageArrivedHandler = messageArrivedHandler;
-        this.logger = ObjectContainer.resolve(ILoggerFactory.class).create(ClientSocket.class);
         this.waitConnectHandle = new ManualResetEvent(false);
 
         this.eventLoopGroupWorker =

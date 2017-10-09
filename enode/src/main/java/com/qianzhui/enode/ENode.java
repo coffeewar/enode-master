@@ -2,19 +2,14 @@ package com.qianzhui.enode;
 
 import com.qianzhui.enode.commanding.*;
 import com.qianzhui.enode.commanding.impl.*;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.LifeStyle;
-import com.qianzhui.enode.common.container.ObjectContainer;
+import com.qianzhui.enode.common.container.*;
 import com.qianzhui.enode.common.io.IOHelper;
-import com.qianzhui.enode.common.logging.EmptyLoggerFactory;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.common.scheduling.ScheduleService;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.thirdparty.gson.GsonJsonSerializer;
 import com.qianzhui.enode.common.thirdparty.guice.GuiceObjectContainer;
-import com.qianzhui.enode.common.thirdparty.log4j.Log4jLoggerFactory;
 import com.qianzhui.enode.configurations.ConfigurationSetting;
 import com.qianzhui.enode.configurations.OptionSetting;
 import com.qianzhui.enode.domain.*;
@@ -27,9 +22,7 @@ import com.qianzhui.enode.infrastructure.impl.inmemory.InMemoryPublishedVersionS
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlLockService;
 import com.qianzhui.enode.infrastructure.impl.mysql.MysqlPublishedVersionStore;
 import com.qianzhui.enode.jmx.ENodeJMXAgent;
-import com.qianzhui.enode.rocketmq.ITopicProvider;
-import com.qianzhui.enode.rocketmq.RocketMQConsumer;
-import com.qianzhui.enode.rocketmq.TopicTagData;
+import com.qianzhui.enode.rocketmq.*;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessageConsumer;
 import com.qianzhui.enode.rocketmq.applicationmessage.ApplicationMessagePublisher;
 import com.qianzhui.enode.rocketmq.client.Consumer;
@@ -49,6 +42,7 @@ import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.FilterBuilder;
+import org.slf4j.Logger;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -62,7 +56,9 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/2/25.
  */
 
-public class ENode {
+public class ENode extends AbstractContainer<ENode> {
+
+    private static final Logger logger = ENodeLogger.getLog();
 
     //ENode Components
     public static final int COMMAND_SERVICE = 1;
@@ -116,22 +112,18 @@ public class ENode {
     }
 
     public ENode useGuice() {
-        ObjectContainer.setContainer(new GuiceObjectContainer());
-        return this;
-    }
+        GuiceObjectContainer objectContainer = new GuiceObjectContainer();
+        ObjectContainer.setContainer(objectContainer); //兼容老版本
+        //设置当前ENode实例的依赖注入容器
+        super.setContainer(objectContainer);
 
-    public ENode commitRegisters() {
-        ObjectContainer.commitRegisters();
+        //注入容器本身，为了使ENode彻底支持多实例，将容器本身注入，原先引用ObjectContainer调用静态方法的地方，可以直接依赖IObjectContainer实例方法
+        registerInstance(IObjectContainer.class, objectContainer);
         return this;
     }
 
     public ConfigurationSetting getSetting() {
         return setting;
-    }
-
-    public ENode registerProperties(Properties properties) {
-        ObjectContainer.registerProperties(properties);
-        return this;
     }
 
     public ENode registerProperties(String propertiesResourceFile) {
@@ -147,79 +139,80 @@ public class ENode {
     }
 
     public ENode registerCommonComponents() {
-        ObjectContainer.register(ILoggerFactory.class, EmptyLoggerFactory.class);
         //TODO binary serializer
         //override<IBinarySerializer, DefaultBinarySerializer>();
 
-        ObjectContainer.register(IJsonSerializer.class, GsonJsonSerializer.class);
-        ObjectContainer.register(IScheduleService.class, ScheduleService.class);
-        ObjectContainer.register(IOHelper.class);
+        register(IJsonSerializer.class, GsonJsonSerializer.class);
+        register(IScheduleService.class, ScheduleService.class);
+        register(IOHelper.class);
         return this;
     }
 
     public ENode registerENodeComponents() {
-        ObjectContainer.register(ITypeNameProvider.class, DefaultTypeNameProvider.class);
-        ObjectContainer.register(IMessageHandlerProvider.class, DefaultMessageHandlerProvider.class);
-        ObjectContainer.register(ITwoMessageHandlerProvider.class, DefaultTwoMessageHandlerProvider.class);
-        ObjectContainer.register(IThreeMessageHandlerProvider.class, DefaultThreeMessageHandlerProvider.class);
+        register(ITypeNameProvider.class, DefaultTypeNameProvider.class);
+        register(IMessageHandlerProvider.class, DefaultMessageHandlerProvider.class);
+        register(ITwoMessageHandlerProvider.class, DefaultTwoMessageHandlerProvider.class);
+        register(IThreeMessageHandlerProvider.class, DefaultThreeMessageHandlerProvider.class);
 
-        ObjectContainer.register(IAggregateRootInternalHandlerProvider.class, DefaultAggregateRootInternalHandlerProvider.class);
-        ObjectContainer.register(IAggregateRepositoryProvider.class, DefaultAggregateRepositoryProvider.class);
-        ObjectContainer.register(IAggregateRootFactory.class, DefaultAggregateRootFactory.class);
-        ObjectContainer.register(IMemoryCache.class, DefaultMemoryCache.class);
-        ObjectContainer.register(IAggregateSnapshotter.class, DefaultAggregateSnapshotter.class);
-        ObjectContainer.register(IAggregateStorage.class, EventSourcingAggregateStorage.class);
-        ObjectContainer.register(IRepository.class, DefaultRepository.class);
+        register(IAggregateRootInternalHandlerProvider.class, DefaultAggregateRootInternalHandlerProvider.class);
+        register(IAggregateRepositoryProvider.class, DefaultAggregateRepositoryProvider.class);
+        register(IAggregateRootFactory.class, DefaultAggregateRootFactory.class);
+        register(IMemoryCache.class, DefaultMemoryCache.class);
+        register(IAggregateSnapshotter.class, DefaultAggregateSnapshotter.class);
+        register(IAggregateStorage.class, EventSourcingAggregateStorage.class);
+        register(IRepository.class, DefaultRepository.class);
 
-        ObjectContainer.register(ICommandAsyncHandlerProvider.class, DefaultCommandAsyncHandlerProvider.class);
-        ObjectContainer.register(ICommandHandlerProvider.class, DefaultCommandHandlerProvider.class);
-        ObjectContainer.register(ICommandRoutingKeyProvider.class, DefaultCommandRoutingKeyProvider.class);
-        ObjectContainer.register(ICommandService.class, NotImplementedCommandService.class);
+        register(ICommandAsyncHandlerProvider.class, DefaultCommandAsyncHandlerProvider.class);
+        register(ICommandHandlerProvider.class, DefaultCommandHandlerProvider.class);
+        register(ICommandRoutingKeyProvider.class, DefaultCommandRoutingKeyProvider.class);
+        register(ICommandService.class, NotImplementedCommandService.class);
 
-        ObjectContainer.register(IEventSerializer.class, DefaultEventSerializer.class);
-        ObjectContainer.register(IEventStore.class, InMemoryEventStore.class);
-        ObjectContainer.register(IPublishedVersionStore.class, InMemoryPublishedVersionStore.class);
-        ObjectContainer.register(IEventService.class, DefaultEventService.class);
+        register(IEventSerializer.class, DefaultEventSerializer.class);
+        register(IEventStore.class, InMemoryEventStore.class);
+        register(IPublishedVersionStore.class, InMemoryPublishedVersionStore.class);
+        register(IEventService.class, DefaultEventService.class);
 
-        ObjectContainer.register(IMessageDispatcher.class, DefaultMessageDispatcher.class);
+        register(IMessageDispatcher.class, DefaultMessageDispatcher.class);
 
 
-        ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<IApplicationMessage>>() {
+        register(new GenericTypeLiteral<IMessagePublisher<IApplicationMessage>>() {
         }, DoNothingPublisher.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<DomainEventStreamMessage>>() {
+        register(new GenericTypeLiteral<IMessagePublisher<DomainEventStreamMessage>>() {
         }, DoNothingPublisher.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<IPublishableException>>() {
+        register(new GenericTypeLiteral<IMessagePublisher<IPublishableException>>() {
         }, DoNothingPublisher.class);
 
-        ObjectContainer.register(IProcessingCommandHandler.class, DefaultProcessingCommandHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        register(IProcessingCommandHandler.class, DefaultProcessingCommandHandler.class);
+        register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, DomainEventStreamMessageHandler.class);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        register(new GenericTypeLiteral<IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
+        register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, null, LifeStyle.Singleton);
-        ObjectContainer.register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        register(new GenericTypeLiteral<IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, new GenericTypeLiteral<DefaultProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, null, LifeStyle.Singleton);
 
 
-        ObjectContainer.register(ICommandProcessor.class, DefaultCommandProcessor.class);
+        register(ICommandProcessor.class, DefaultCommandProcessor.class);
 
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, DefaultApplicationMessageProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        register(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }, DefaultDomainEventProcessor.class);
-        ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        register(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }, DefaultPublishableExceptionProcessor.class);
+
+        registerStaticInjection(AggregateRoot.class);
 
         /*ObjectContainer.register(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }, new GenericTypeLiteral<DefaultMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
@@ -251,13 +244,8 @@ public class ENode {
         return this;
     }
 
-    public ENode userLog4j(String configFile) {
-        ObjectContainer.registerInstance(ILoggerFactory.class, new Log4jLoggerFactory(configFile));
-        return this;
-    }
-
     public ENode useSnapshotOnlyAggregateStorage() {
-        ObjectContainer.register(IAggregateStorage.class, SnapshotOnlyAggregateStorage.class);
+        register(IAggregateStorage.class, SnapshotOnlyAggregateStorage.class);
         return this;
     }
 
@@ -268,31 +256,27 @@ public class ENode {
     }
 
     public ENode useMysqlLockService(DataSource ds, OptionSetting optionSetting) {
-        ObjectContainer.registerInstance(ILockService.class, new MysqlLockService(ds, optionSetting));
+        registerInstance(ILockService.class, new MysqlLockService(ds, optionSetting));
 
         return this;
     }
 
     public ENode useMysqlEventStore(DataSource ds, OptionSetting optionSetting) {
         //TODO primary key name,index name,bulk copy property
-        ObjectContainer.register(IEventStore.class, null, () -> {
-            return new MysqlEventStore(ds, optionSetting);
-        }, LifeStyle.Singleton);
+        register(IEventStore.class, null, () -> new MysqlEventStore(ds, optionSetting, getContainer()), LifeStyle.Singleton);
 
         return this;
     }
 
     public ENode useMysqlPublishedVersionStore(DataSource ds, OptionSetting optionSetting) {
-        ObjectContainer.register(IPublishedVersionStore.class, null, () -> {
-            return new MysqlPublishedVersionStore(ds, optionSetting);
-        }, LifeStyle.Singleton);
+        register(IPublishedVersionStore.class, null, () -> new MysqlPublishedVersionStore(ds, optionSetting), LifeStyle.Singleton);
 
         return this;
     }
 
     private void registerComponentType(Class type) {
         LifeStyle life = parseComponentLife(type);
-        ObjectContainer.register(type, null, life);
+        register(type, null, life);
 
         if (isENodeGenericComponentType(type)) {
             registerENodeGenericComponentType(type);
@@ -309,7 +293,7 @@ public class ENode {
         superInterfaces.forEach(superInterface -> {
             Type superGenericInterface = TypeUtils.getSuperGenericInterface(type, superInterface);
             if (superGenericInterface != null) {
-                ObjectContainer.register(GenericTypeLiteral.get(superGenericInterface), type);
+                register(GenericTypeLiteral.get(superGenericInterface), type);
             }
         });
     }
@@ -324,7 +308,6 @@ public class ENode {
         return LifeStyle.Singleton;
     }
 
-    //TODO endoe component types
     private static final Set<Class> ENODE_COMPONENT_TYPES = new HashSet<Class>() {{
         add(ICommandHandler.class);
         add(ICommandAsyncHandler.class);
@@ -333,18 +316,14 @@ public class ENode {
         add(ITopicProvider.class);
     }};
 
-    //TODO endoe generic component types
     private static final Set<Class> ENODE_GENERIC_COMPONENT_TYPES = new HashSet<Class>() {{
-//        add(ICommandAsyncHandler.class);
-//        add(IMessageHandler.class);
-//        add(IAggregateRepository.class);
         add(ITopicProvider.class);
     }};
 
 
     private ENode initializeBusinessAssemblies() {
         _assemblyInitializerServiceTypes.stream()
-                .map(x -> (IAssemblyInitializer) ObjectContainer.resolve(x))
+                .map(x -> (IAssemblyInitializer) resolve(x))
                 .forEach(x -> x.initialize(assemblyTypes));
 
         return this;
@@ -366,15 +345,9 @@ public class ENode {
         return ENODE_GENERIC_COMPONENT_TYPES.stream().anyMatch(x -> x.isAssignableFrom(type));
     }
 
-    public ENode registerStaticInjection(Class staticInjectionClass) {
-        ObjectContainer.registerStaticInjection(staticInjectionClass);
-        return this;
-    }
-
     public ENode registerDefaultComponents() {
         return useGuice()
                 .registerCommonComponents()
-                .userLog4j(null)
                 .registerENodeComponents()
                 .registerBusinessComponents();
     }
@@ -407,27 +380,32 @@ public class ENode {
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             Consumer consumer = mqFactory.createPushConsumer(consumerSetting);
 
-            ObjectContainer.registerInstance(Consumer.class, consumer);
-            ObjectContainer.register(RocketMQConsumer.class);
+            registerInstance(Consumer.class, consumer);
+            register(RocketMQConsumer.class);
+
+            // CommandConsumer、DomainEventConsumer需要引用SendReplyService
+            if(hasAnyComponents(registerRocketMQComponentsFlag, COMMAND_CONSUMER | DOMAIN_EVENT_CONSUMER)) {
+                register(SendReplyService.class);
+            }
 
             //CommandConsumer
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_CONSUMER)) {
-                ObjectContainer.register(CommandConsumer.class);
+                register(CommandConsumer.class);
             }
 
             //DomainEventConsumer
             if (hasComponent(registerRocketMQComponentsFlag, DOMAIN_EVENT_CONSUMER)) {
-                ObjectContainer.register(DomainEventConsumer.class);
+                register(DomainEventConsumer.class);
             }
 
             //ApplicationMessageConsumer
             if (hasComponent(registerRocketMQComponentsFlag, APPLICATION_MESSAGE_CONSUMER)) {
-                ObjectContainer.register(ApplicationMessageConsumer.class);
+                register(ApplicationMessageConsumer.class);
             }
 
             //PublishableExceptionConsumer
             if (hasComponent(registerRocketMQComponentsFlag, EXCEPTION_CONSUMER)) {
-                ObjectContainer.register(PublishableExceptionConsumer.class);
+                register(PublishableExceptionConsumer.class);
             }
         }
 
@@ -435,32 +413,35 @@ public class ENode {
         if (hasAnyComponents(registerRocketMQComponentsFlag, PUBLISHERS)) {
             //Create MQProducer
             Producer producer = mqFactory.createProducer(producerSetting);
-            ObjectContainer.registerInstance(Producer.class, producer);
+            registerInstance(Producer.class, producer);
+
+            register(SendQueueMessageService.class);
 
             //CommandService
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_SERVICE)) {
 //                ObjectContainer.register(CommandResultProcessor.class);
-                ObjectContainer.register(CommandResultProcessor.class, null, () -> {
-                    return new CommandResultProcessor(listenPort);
+                register(CommandResultProcessor.class, null, () -> {
+                    IJsonSerializer jsonSerializer = resolve(IJsonSerializer.class);
+                    return new CommandResultProcessor(listenPort, jsonSerializer);
                 }, LifeStyle.Singleton);
-                ObjectContainer.register(ICommandService.class, CommandService.class);
+                register(ICommandService.class, CommandService.class);
             }
 
             //DomainEventPublisher
             if (hasComponent(registerRocketMQComponentsFlag, DOMAIN_EVENT_PUBLISHER)) {
-                ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<DomainEventStreamMessage>>() {
+                register(new GenericTypeLiteral<IMessagePublisher<DomainEventStreamMessage>>() {
                 }, DomainEventPublisher.class);
             }
 
             //ApplicationMessagePublisher
             if (hasComponent(registerRocketMQComponentsFlag, APPLICATION_MESSAGE_PUBLISHER)) {
-                ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<IApplicationMessage>>() {
+                register(new GenericTypeLiteral<IMessagePublisher<IApplicationMessage>>() {
                 }, ApplicationMessagePublisher.class);
             }
 
             //PublishableExceptionPublisher
             if (hasComponent(registerRocketMQComponentsFlag, EXCEPTION_PUBLISHER)) {
-                ObjectContainer.register(new GenericTypeLiteral<IMessagePublisher<IPublishableException>>() {
+                register(new GenericTypeLiteral<IMessagePublisher<IPublishableException>>() {
                 }, PublishableExceptionPublisher.class);
             }
         }
@@ -469,8 +450,6 @@ public class ENode {
     }
 
     private void startRocketMQComponents() {
-        ILogger logger = ObjectContainer.resolve(ILoggerFactory.class).create(this.getClass());
-
         //Start MQConsumer and any register consumers(CommandConsumer、DomainEventConsumer、ApplicationMessageConsumer、PublishableExceptionConsumer)
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             //All topic
@@ -478,33 +457,33 @@ public class ENode {
 
             //CommandConsumer
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_CONSUMER)) {
-                CommandConsumer commandConsumer = ObjectContainer.resolve(CommandConsumer.class);
+                CommandConsumer commandConsumer = resolve(CommandConsumer.class);
                 commandConsumer.start();
 
                 //Command topics
-                ITopicProvider<ICommand> commandTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
+                ITopicProvider<ICommand> commandTopicProvider = resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
                 });
                 topicTagDatas.addAll(commandTopicProvider.getAllSubscribeTopics());
             }
 
             //DomainEventConsumer
             if (hasComponent(registerRocketMQComponentsFlag, DOMAIN_EVENT_CONSUMER)) {
-                DomainEventConsumer domainEventConsumer = ObjectContainer.resolve(DomainEventConsumer.class);
+                DomainEventConsumer domainEventConsumer = resolve(DomainEventConsumer.class);
                 domainEventConsumer.start();
 
                 //Domain event topics
-                ITopicProvider<IDomainEvent> domainEventTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IDomainEvent>>() {
+                ITopicProvider<IDomainEvent> domainEventTopicProvider = resolve(new GenericTypeLiteral<ITopicProvider<IDomainEvent>>() {
                 });
                 topicTagDatas.addAll(domainEventTopicProvider.getAllSubscribeTopics());
             }
 
             //ApplicationMessageConsumer
             if (hasComponent(registerRocketMQComponentsFlag, APPLICATION_MESSAGE_CONSUMER)) {
-                ApplicationMessageConsumer applicationMessageConsumer = ObjectContainer.resolve(ApplicationMessageConsumer.class);
+                ApplicationMessageConsumer applicationMessageConsumer = resolve(ApplicationMessageConsumer.class);
                 applicationMessageConsumer.start();
 
                 //Application message topics
-                ITopicProvider<IApplicationMessage> applicationMessageTopicProvider = ObjectContainer.tryResolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
+                ITopicProvider<IApplicationMessage> applicationMessageTopicProvider = resolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
                 });
                 if (applicationMessageTopicProvider != null) {
                     topicTagDatas.addAll(applicationMessageTopicProvider.getAllSubscribeTopics());
@@ -513,18 +492,18 @@ public class ENode {
 
             //PublishableExceptionConsumer
             if (hasComponent(registerRocketMQComponentsFlag, EXCEPTION_CONSUMER)) {
-                PublishableExceptionConsumer publishableExceptionConsumer = ObjectContainer.resolve(PublishableExceptionConsumer.class);
+                PublishableExceptionConsumer publishableExceptionConsumer = resolve(PublishableExceptionConsumer.class);
                 publishableExceptionConsumer.start();
 
                 //Exception topics
-                ITopicProvider<IPublishableException> exceptionTopicProvider = ObjectContainer.tryResolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
+                ITopicProvider<IPublishableException> exceptionTopicProvider = resolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
                 });
                 if (exceptionTopicProvider != null) {
                     topicTagDatas.addAll(exceptionTopicProvider.getAllSubscribeTopics());
                 }
             }
 
-            RocketMQConsumer rocketMQConsumer = ObjectContainer.resolve(RocketMQConsumer.class);
+            RocketMQConsumer rocketMQConsumer = resolve(RocketMQConsumer.class);
             //topicTagDatas.stream().forEach(topicTagData -> rocketMQConsumer.subscribe(topicTagData.getTopic(), topicTagData.getTag()));
 
             topicTagDatas.stream().collect(Collectors.groupingBy(TopicTagData::getTopic)).forEach((topic, tags) -> {
@@ -538,12 +517,12 @@ public class ENode {
         //Start MQProducer and any register publishers(CommandService、DomainEventPublisher、ApplicationMessagePublisher、PublishableExceptionPublisher)
         if (hasAnyComponents(registerRocketMQComponentsFlag, PUBLISHERS)) {
             //Start MQProducer
-            Producer producer = ObjectContainer.resolve(Producer.class);
+            Producer producer = resolve(Producer.class);
             producer.start();
 
             //CommandService
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_SERVICE)) {
-                ICommandService commandService = ObjectContainer.resolve(ICommandService.class);
+                ICommandService commandService = resolve(ICommandService.class);
                 if (commandService instanceof CommandService) {
                     ((CommandService) commandService).start();
                 }
@@ -603,33 +582,33 @@ public class ENode {
         initializeBusinessAssemblies();
         startRocketMQComponents();
         ENodeJMXAgent.startAgent();
-        System.out.println("ENode started.");
+        logger.info("ENode started.");
         return this;
     }
 
     private void startENodeComponents() {
-        ObjectContainer.resolve(IMemoryCache.class).start();
-        ObjectContainer.resolve(ICommandProcessor.class).start();
-        ObjectContainer.resolve(IEventService.class).start();
+        resolve(IMemoryCache.class).start();
+        resolve(ICommandProcessor.class).start();
+        resolve(IEventService.class).start();
 
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }).start();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }).start();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }).start();
     }
 
     private void stopENodeComponents() {
-        ObjectContainer.resolve(IMemoryCache.class).stop();
-        ObjectContainer.resolve(ICommandProcessor.class).stop();
-        ObjectContainer.resolve(IEventService.class).stop();
+        resolve(IMemoryCache.class).stop();
+        resolve(ICommandProcessor.class).stop();
+        resolve(IEventService.class).stop();
 
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
         }).stop();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingDomainEventStreamMessage, DomainEventStreamMessage>>() {
         }).stop();
-        ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
+        resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
         }).stop();
     }
 
@@ -639,41 +618,41 @@ public class ENode {
         if (hasAnyComponents(registerRocketMQComponentsFlag, CONSUMERS)) {
             //CommandConsumer
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_CONSUMER)) {
-                CommandConsumer commandConsumer = ObjectContainer.resolve(CommandConsumer.class);
+                CommandConsumer commandConsumer = resolve(CommandConsumer.class);
                 commandConsumer.shutdown();
             }
 
             //DomainEventConsumer
             if (hasComponent(registerRocketMQComponentsFlag, DOMAIN_EVENT_CONSUMER)) {
-                DomainEventConsumer domainEventConsumer = ObjectContainer.resolve(DomainEventConsumer.class);
+                DomainEventConsumer domainEventConsumer = resolve(DomainEventConsumer.class);
                 domainEventConsumer.shutdown();
             }
 
             //ApplicationMessageConsumer
             if (hasComponent(registerRocketMQComponentsFlag, APPLICATION_MESSAGE_CONSUMER)) {
-                ApplicationMessageConsumer applicationMessageConsumer = ObjectContainer.resolve(ApplicationMessageConsumer.class);
+                ApplicationMessageConsumer applicationMessageConsumer = resolve(ApplicationMessageConsumer.class);
                 applicationMessageConsumer.shutdown();
             }
 
             //PublishableExceptionConsumer
             if (hasComponent(registerRocketMQComponentsFlag, EXCEPTION_CONSUMER)) {
-                PublishableExceptionConsumer publishableExceptionConsumer = ObjectContainer.resolve(PublishableExceptionConsumer.class);
+                PublishableExceptionConsumer publishableExceptionConsumer = resolve(PublishableExceptionConsumer.class);
                 publishableExceptionConsumer.shutdown();
             }
 
-            RocketMQConsumer consumer = ObjectContainer.resolve(RocketMQConsumer.class);
+            RocketMQConsumer consumer = resolve(RocketMQConsumer.class);
             consumer.shutdown();
         }
 
         //Shutdown MQProducer and any register publishers(CommandService、DomainEventPublisher、ApplicationMessagePublisher、PublishableExceptionPublisher)
         if (hasAnyComponents(registerRocketMQComponentsFlag, PUBLISHERS)) {
             //Start MQProducer
-            Producer producer = ObjectContainer.resolve(Producer.class);
+            Producer producer = resolve(Producer.class);
             producer.shutdown();
 
             //CommandService
             if (hasComponent(registerRocketMQComponentsFlag, COMMAND_SERVICE)) {
-                CommandService commandService = ObjectContainer.resolve(CommandService.class);
+                CommandService commandService = resolve(CommandService.class);
                 commandService.shutdown();
             }
         }

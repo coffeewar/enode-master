@@ -1,11 +1,10 @@
 package com.qianzhui.enode.rocketmq;
 
 import com.alibaba.rocketmq.common.message.MessageExt;
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.rocketmq.client.Consumer;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -15,10 +14,10 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/4/15.
  */
 public class RocketMQConsumer {
+    private static final Logger _logger = ENodeLogger.getLog();
     private Consumer _consumer;
     private Set<RocketMQMessageHandler> _handlers;
     private Map<TopicTagData, RocketMQMessageHandler> _handlerDict;
-    private ILogger _logger;
 
     @Inject
     public RocketMQConsumer(Consumer consumer) {
@@ -26,7 +25,6 @@ public class RocketMQConsumer {
         _consumer.registerMessageListener(this::handle);
         _handlers = new HashSet<>();
         _handlerDict = new HashMap<>();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
     }
 
     public void registerMessageHandler(RocketMQMessageHandler handler) {
@@ -58,7 +56,7 @@ public class RocketMQConsumer {
         if (rocketMQMessageHandler == null) {
             List<RocketMQMessageHandler> handlers = _handlers.stream().filter(handler -> handler.isMatched(topicTagData)).collect(Collectors.toList());
             if (handlers.size() > 1) {
-                _logger.error("Duplicate consume handler with {topic:%s,tags:%s}", msg.getTopic(), msg.getTags());
+                _logger.error("Duplicate consume handler with {topic:{},tags:{}}", msg.getTopic(), msg.getTags());
                 context.reconsumeLater();
 //                return CompletableFuture.completedFuture(ConsumeConcurrentlyStatus.RECONSUME_LATER);
 //                return ConsumeConcurrentlyStatus.RECONSUME_LATER;
@@ -69,7 +67,7 @@ public class RocketMQConsumer {
         }
 
         if (rocketMQMessageHandler == null) {
-            _logger.error("No consume handler found with {topic:%s,tags:%s}", msg.getTopic(), msg.getTags());
+            _logger.error("No consume handler found with {topic:{},tags:{}}", msg.getTopic(), msg.getTags());
 //            return ConsumeConcurrentlyStatus.RECONSUME_LATER;
             //return CompletableFuture.completedFuture(ConsumeConcurrentlyStatus.RECONSUME_LATER);
             context.reconsumeLater();

@@ -1,11 +1,10 @@
 package com.qianzhui.enode.common.socketing.framing;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.extensions.ArraySegment;
 import com.qianzhui.enode.common.function.Action1;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.utilities.Ensure;
+import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.List;
@@ -15,7 +14,7 @@ import java.util.List;
  */
 public class LengthPrefixMessageFramer implements IMessageFramer {
 
-    private static final ILogger logger = ObjectContainer.resolve(ILoggerFactory.class).create(LengthPrefixMessageFramer.class);
+    private static final Logger logger = ENodeLogger.getLog();
 
     private int headerLength = Integer.SIZE / 8;
     private Action1<ArraySegment<Byte>> receivedHandler;
@@ -66,9 +65,9 @@ public class LengthPrefixMessageFramer implements IMessageFramer {
                 }
             } else {
                 int copyCnt = Math.min(bytes.getCount() + bytes.getOffset() - i, packageLength - bufferIndex);
-                try{
+                try {
                     System.arraycopy(bytes.getArray(), i, messageBuffer, bufferIndex, copyCnt);
-                } catch (Exception ex){
+                } catch (Exception ex) {
                     logger.error(String.format("Parse message buffer failed, _headerLength: %d, _packageLength: %d, _bufferIndex: %d, copyCnt: %d, _messageBuffer is null: %s",
                             headerBytes,
                             packageLength,

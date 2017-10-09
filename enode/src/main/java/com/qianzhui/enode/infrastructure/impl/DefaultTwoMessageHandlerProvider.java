@@ -1,10 +1,12 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.eventing.IDomainEvent;
 import com.qianzhui.enode.infrastructure.IMessageHandler;
 import com.qianzhui.enode.infrastructure.IMessageHandlerProxy2;
 import com.qianzhui.enode.infrastructure.ITwoMessageHandlerProvider;
 
+import javax.inject.Inject;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -13,6 +15,13 @@ import java.util.List;
  * Created by junbo_xu on 2016/4/3.
  */
 public class DefaultTwoMessageHandlerProvider extends AbstractHandlerProvider<ManyType, IMessageHandlerProxy2, List<Class>> implements ITwoMessageHandlerProvider {
+    private IObjectContainer objectContainer;
+
+    @Inject
+    public DefaultTwoMessageHandlerProvider(IObjectContainer objectContainer) {
+        this.objectContainer = objectContainer;
+    }
+
     @Override
     protected Class getHandlerType() {
         return IMessageHandler.class;
@@ -30,7 +39,7 @@ public class DefaultTwoMessageHandlerProvider extends AbstractHandlerProvider<Ma
 
     @Override
     protected boolean isHandlerSourceMatchKey(List<Class> handlerSource, ManyType key) {
-        if(handlerSource.size() != 2)
+        if (handlerSource.size() != 2)
             return false;
 
         for (Class type : key.getTypes()) {
@@ -48,5 +57,10 @@ public class DefaultTwoMessageHandlerProvider extends AbstractHandlerProvider<Ma
                 && method.getParameterTypes().length == 2
                 && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[0])
                 && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[1]);
+    }
+
+    @Override
+    protected IObjectContainer getObjectContainer() {
+        return objectContainer;
     }
 }

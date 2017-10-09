@@ -4,11 +4,9 @@ import com.qianzhui.enode.commanding.CommandResult;
 import com.qianzhui.enode.commanding.CommandReturnType;
 import com.qianzhui.enode.commanding.CommandStatus;
 import com.qianzhui.enode.commanding.ICommand;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.remoting.*;
 import com.qianzhui.enode.common.scheduling.Worker;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
@@ -16,8 +14,8 @@ import com.qianzhui.enode.common.socketing.NettyServerConfig;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.rocketmq.CommandReplyType;
 import com.qianzhui.enode.rocketmq.domainevent.DomainEventHandledMessage;
+import org.slf4j.Logger;
 
-import javax.inject.Inject;
 import java.net.SocketAddress;
 import java.util.concurrent.*;
 
@@ -25,6 +23,8 @@ import java.util.concurrent.*;
  * Created by junbo_xu on 2016/3/8.
  */
 public class CommandResultProcessor implements IRequestHandler {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private SocketRemotingServer _remotingServer;
     private ConcurrentMap<String, CommandTaskCompletionSource> _commandTaskDict;
     private BlockingQueue<CommandResult> _commandExecutedMessageLocalQueue;
@@ -32,12 +32,11 @@ public class CommandResultProcessor implements IRequestHandler {
     private Worker _commandExecutedMessageWorker;
     private Worker _domainEventHandledMessageWorker;
     private IJsonSerializer _jsonSerializer;
-    private ILogger _logger;
     private boolean _started;
 
     public SocketAddress _bindingAddress;
 
-    public CommandResultProcessor(int listenPort) {
+    public CommandResultProcessor(int listenPort, IJsonSerializer jsonSerializer) {
         NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(listenPort);
         _remotingServer = new SocketRemotingServer("CommandResultProcessor.RemotingServer", nettyServerConfig);
@@ -46,8 +45,7 @@ public class CommandResultProcessor implements IRequestHandler {
         _domainEventHandledMessageLocalQueue = new LinkedBlockingQueue<>();
         _commandExecutedMessageWorker = new Worker("ProcessExecutedCommandMessage", () -> processExecutedCommandMessage(_commandExecutedMessageLocalQueue.take()));
         _domainEventHandledMessageWorker = new Worker("ProcessDomainEventHandledMessage", () -> processDomainEventHandledMessage(_domainEventHandledMessageLocalQueue.take()));
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(CommandResultProcessor.class);
+        _jsonSerializer = jsonSerializer;
     }
 
     public void registerProcessingCommand(ICommand command, CommandReturnType commandReturnType, CompletableFuture<AsyncTaskResult<CommandResult>> taskCompletionSource) {
@@ -80,7 +78,7 @@ public class CommandResultProcessor implements IRequestHandler {
 
         _started = true;
 
-        _logger.info("Command result processor started, bindingAddress: %s", _remotingServer.getServerSocket().getListeningEndPoint());
+        _logger.info("Command result processor started, bindingAddress: {}", _remotingServer.getServerSocket().getListeningEndPoint());
 
         return this;
     }
@@ -106,7 +104,7 @@ public class CommandResultProcessor implements IRequestHandler {
             DomainEventHandledMessage message = _jsonSerializer.deserialize(json, DomainEventHandledMessage.class);
             _domainEventHandledMessageLocalQueue.add(message);
         } else {
-            _logger.error("Invalid remoting request code: %d", remotingRequest.getCode());
+            _logger.error("Invalid remoting request code: {}", remotingRequest.getCode());
         }
         return null;
     }
@@ -119,17 +117,13 @@ public class CommandResultProcessor implements IRequestHandler {
                 _commandTaskDict.remove(commandResult.getCommandId());
 
                 if (commandTaskCompletionSource.getTaskCompletionSource().complete(new AsyncTaskResult<>(AsyncTaskStatus.Success, commandResult))) {
-                    if (_logger.isDebugEnabled()) {
-                        _logger.debug("Command result return, %s", commandResult);
-                    }
+                    _logger.debug("Command result return, {}", commandResult);
                 }
             } else if (commandTaskCompletionSource.getCommandReturnType().equals(CommandReturnType.EventHandled)) {
                 if (commandResult.getStatus().equals(CommandStatus.Failed) || commandResult.getStatus().equals(CommandStatus.NothingChanged)) {
                     _commandTaskDict.remove(commandResult.getCommandId());
                     if (commandTaskCompletionSource.getTaskCompletionSource().complete(new AsyncTaskResult<>(AsyncTaskStatus.Success, commandResult))) {
-                        if (_logger.isDebugEnabled()) {
-                            _logger.debug("Command result return, %s", commandResult);
-                        }
+                        _logger.debug("Command result return, {}", commandResult);
                     }
                 }
             }
@@ -142,9 +136,7 @@ public class CommandResultProcessor implements IRequestHandler {
             CommandResult commandResult = new CommandResult(CommandStatus.Success, message.getCommandId(), message.getAggregateRootId(), message.getCommandResult(), message.getCommandResult() != null ? String.class.getName() : null);
 
             if (commandTaskCompletionSource.getTaskCompletionSource().complete(new AsyncTaskResult<>(AsyncTaskStatus.Success, commandResult))) {
-                if (_logger.isDebugEnabled()) {
-                    _logger.debug("Command result return, %s", commandResult);
-                }
+                _logger.debug("Command result return, {}", commandResult);
             }
         }
     }

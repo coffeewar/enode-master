@@ -1,16 +1,16 @@
 package com.qianzhui.enode.rocketmq;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.IOHelper;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.remoting.RemotingRequest;
 import com.qianzhui.enode.common.remoting.SocketRemotingClient;
 import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.common.utilities.Ensure;
+import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
@@ -24,20 +24,22 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/3/14.
  */
 public class SendReplyService {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private ConcurrentMap<String, SocketRemotingClient> _remotingClientDict;
     private IJsonSerializer _jsonSerializer;
     private IScheduleService _scheduleService;
     private IOHelper _ioHelper;
-    private ILogger _logger;
     private final String _scanInactiveCommandRemotingClientTaskName;
 
-    public SendReplyService() {
+    @Inject
+    public SendReplyService(IJsonSerializer jsonSerializer,
+                            IScheduleService scheduleService,
+                            IOHelper ioHelper) {
         _remotingClientDict = new ConcurrentHashMap<>();
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _scheduleService = ObjectContainer.resolve(IScheduleService.class);
-        _ioHelper = ObjectContainer.resolve(IOHelper.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(SendReplyService.class);
-
+        _jsonSerializer = jsonSerializer;
+        _scheduleService = scheduleService;
+        _ioHelper = ioHelper;
 
         _scanInactiveCommandRemotingClientTaskName = "ScanInactiveCommandRemotingClient_" + System.nanoTime() + new Random().nextInt(10000);
     }
@@ -82,7 +84,7 @@ public class SendReplyService {
 
         inactiveList.stream().forEach(entry -> {
             if (_remotingClientDict.remove(entry.getKey()) != null) {
-                _logger.info("Removed disconnected command remoting client, remotingAddress: %s", entry.getKey());
+                _logger.info("Removed disconnected command remoting client, remotingAddress: {}", entry.getKey());
             }
         });
     }
@@ -119,7 +121,7 @@ public class SendReplyService {
 
     private SocketRemotingClient createReplyRemotingClient(InetSocketAddress replyEndpoint) {
         return _remotingClientDict.computeIfAbsent(toReplyAddress(replyEndpoint), key ->
-                new SocketRemotingClient(replyEndpoint).start()
+                new SocketRemotingClient(replyEndpoint, _scheduleService).start()
         );
     }
 

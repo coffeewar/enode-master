@@ -1,6 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.eventing.DomainEventStreamMessage;
 import com.qianzhui.enode.infrastructure.IProcessingMessageHandler;
 import com.qianzhui.enode.infrastructure.IProcessingMessageScheduler;
@@ -16,8 +16,8 @@ public class DefaultDomainEventProcessor extends DefaultMessageProcessor<Process
     public DefaultDomainEventProcessor(
             IProcessingMessageScheduler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> processingMessageScheduler,
             IProcessingMessageHandler<ProcessingDomainEventStreamMessage, DomainEventStreamMessage> processingMessageHandler,
-            ILoggerFactory loggerFactory) {
-        super(processingMessageScheduler, processingMessageHandler, loggerFactory);
+            IScheduleService scheduleService) {
+        super(processingMessageScheduler, processingMessageHandler, scheduleService);
     }
 
     @Override

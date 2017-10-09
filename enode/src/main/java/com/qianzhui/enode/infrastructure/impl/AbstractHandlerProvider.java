@@ -1,7 +1,7 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.common.container.LifeStyle;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.infrastructure.*;
 import org.reflections.ReflectionUtils;
 
@@ -32,6 +32,8 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
     protected abstract boolean isHandlerSourceMatchKey(THandlerSource handlerSource, TKey key);
 
     protected abstract boolean isHandleMethodMatch(Method method);
+
+    protected abstract IObjectContainer getObjectContainer();
 
     @Override
     public void initialize(Set<Class<?>> componentTypes) {
@@ -104,7 +106,7 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
 
     private void registerHandler(Class handlerType) {
         LifeStyle lifeStyle = parseComponentLife(handlerType);
-        Object handleObj = lifeStyle == LifeStyle.Singleton ? ObjectContainer.resolve(handlerType) : null;
+        Object handleObj = lifeStyle == LifeStyle.Singleton ? getObjectContainer().resolve(handlerType) : null;
 
         Set<Method> handleMethods = ReflectionUtils.getMethods(handlerType, this::isHandleMethodMatch);
 
@@ -128,7 +130,7 @@ public abstract class AbstractHandlerProvider<TKey, THandlerProxyInterface exten
                     throw new InvalidOperationException("Handler cannot handle duplicate message, handlerType:" + handlerType);
                 }*/
 
-                THandlerProxyInterface handlerProxy = getHandlerProxyImplementationType().getConstructor(Class.class, getHandlerType(), MethodHandle.class, Method.class).newInstance(handlerType, handleObj, handleMethod, method);
+                THandlerProxyInterface handlerProxy = getHandlerProxyImplementationType().getConstructor(IObjectContainer.class, Class.class, getHandlerType(), MethodHandle.class, Method.class).newInstance(getObjectContainer(), handlerType, handleObj, handleMethod, method);
                 handlers.add(handlerProxy);
             } catch (Exception e) {
                 throw new RuntimeException(e);

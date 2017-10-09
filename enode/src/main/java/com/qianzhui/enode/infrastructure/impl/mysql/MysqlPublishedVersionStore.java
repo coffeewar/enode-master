@@ -2,17 +2,16 @@ package com.qianzhui.enode.infrastructure.impl.mysql;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.ENode;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.utilities.Ensure;
 import com.qianzhui.enode.configurations.DefaultDBConfigurationSetting;
 import com.qianzhui.enode.configurations.OptionSetting;
 import com.qianzhui.enode.infrastructure.IPublishedVersionStore;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
+import org.slf4j.Logger;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -26,18 +25,18 @@ import java.util.concurrent.Executors;
  * Created by junbo_xu on 2016/4/3.
  */
 public class MysqlPublishedVersionStore implements IPublishedVersionStore {
+    private static final Logger _logger = ENodeLogger.getLog();
 
     private final DataSource _ds;
     private final QueryRunner _queryRunner;
     private final String _tableName;
     private final String _uniqueIndexName;
-    private final ILogger _logger;
     private final Executor executor;
 
     public MysqlPublishedVersionStore(DataSource ds, OptionSetting optionSetting) {
         Ensure.notNull(ds, "ds");
 
-        if(optionSetting != null) {
+        if (optionSetting != null) {
             _tableName = optionSetting.getOptionValue("TableName");
             _uniqueIndexName = optionSetting.getOptionValue("UniqueIndexName");
         } else {
@@ -52,7 +51,6 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
         _ds = ds;
         _queryRunner = new QueryRunner(ds);
 
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
         executor = Executors.newFixedThreadPool(4, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("MysqlPublishedVersionStoreExecutor-%d").build());
     }
 
@@ -69,7 +67,7 @@ public class MysqlPublishedVersionStore implements IPublishedVersionStore {
 
                     return AsyncTaskResult.Success;
                 } catch (SQLException ex) {
-                    if(ex.getErrorCode() == 1062 && ex.getMessage().contains(_uniqueIndexName)){
+                    if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_uniqueIndexName)) {
                         return AsyncTaskResult.Success;
                     }
                     _logger.error("Insert aggregate published version has sql exception.", ex);

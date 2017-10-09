@@ -1,14 +1,23 @@
 package com.qianzhui.enode.commanding.impl;
 
 import com.qianzhui.enode.commanding.*;
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.infrastructure.impl.AbstractHandlerProvider;
 
+import javax.inject.Inject;
 import java.lang.reflect.Method;
 
 /**
  * Created by junbo_xu on 2016/3/21.
  */
 public class DefaultCommandHandlerProvider extends AbstractHandlerProvider<Class, ICommandHandlerProxy, Class> implements ICommandHandlerProvider {
+    private IObjectContainer objectContainer;
+
+    @Inject
+    public DefaultCommandHandlerProvider(IObjectContainer objectContainer) {
+        this.objectContainer = objectContainer;
+    }
+
     public DefaultCommandHandlerProvider(){
     }
     protected Class getHandlerType() {
@@ -36,5 +45,10 @@ public class DefaultCommandHandlerProvider extends AbstractHandlerProvider<Class
                 && method.getParameterTypes().length == 2
                 && method.getParameterTypes()[0] == ICommandContext.class
                 && ICommand.class.isAssignableFrom(method.getParameterTypes()[1]);
+    }
+
+    @Override
+    protected IObjectContainer getObjectContainer() {
+        return objectContainer;
     }
 }

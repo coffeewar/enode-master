@@ -3,7 +3,6 @@ package com.qianzhui.enode.eventing.impl;
 import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.IOHelper;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.eventing.DomainEventStreamMessage;
 import com.qianzhui.enode.infrastructure.IMessageDispatcher;
 import com.qianzhui.enode.infrastructure.IPublishedVersionStore;
@@ -20,8 +19,8 @@ public class DomainEventStreamMessageHandler extends AbstractSequenceProcessingM
     private final IMessageDispatcher _dispatcher;
 
     @Inject
-    public DomainEventStreamMessageHandler(IPublishedVersionStore publishedVersionStore, IMessageDispatcher dispatcher, IOHelper ioHelper, ILoggerFactory loggerFactory) {
-        super(publishedVersionStore, ioHelper, loggerFactory);
+    public DomainEventStreamMessageHandler(IPublishedVersionStore publishedVersionStore, IMessageDispatcher dispatcher, IOHelper ioHelper) {
+        super(publishedVersionStore, ioHelper);
         _dispatcher = dispatcher;
     }
 

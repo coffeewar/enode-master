@@ -1,6 +1,6 @@
 package com.qianzhui.enode.infrastructure.impl;
 
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.infrastructure.IProcessingMessageHandler;
 import com.qianzhui.enode.infrastructure.IProcessingMessageScheduler;
 import com.qianzhui.enode.infrastructure.IPublishableException;
@@ -16,8 +16,8 @@ public class DefaultPublishableExceptionProcessor extends DefaultMessageProcesso
     public DefaultPublishableExceptionProcessor(
             IProcessingMessageScheduler<ProcessingPublishableExceptionMessage, IPublishableException> processingMessageScheduler,
             IProcessingMessageHandler<ProcessingPublishableExceptionMessage, IPublishableException> processingMessageHandler,
-            ILoggerFactory loggerFactory) {
-        super(processingMessageScheduler, processingMessageHandler, loggerFactory);
+            IScheduleService scheduleService) {
+        super(processingMessageScheduler, processingMessageHandler, scheduleService);
     }
 
     @Override

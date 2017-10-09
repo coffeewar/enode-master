@@ -1,8 +1,6 @@
 package com.qianzhui.enode.common.remoting;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.remoting.exceptions.RemotingRequestException;
 import com.qianzhui.enode.common.remoting.exceptions.RemotingServerUnAvailableException;
 import com.qianzhui.enode.common.remoting.exceptions.RemotingTimeoutException;
@@ -11,11 +9,11 @@ import com.qianzhui.enode.common.scheduling.IScheduleService;
 import com.qianzhui.enode.common.socketing.ClientSocket;
 import com.qianzhui.enode.common.socketing.IConnectionEventListener;
 import com.qianzhui.enode.common.socketing.NettyClientConfig;
-import com.qianzhui.enode.common.socketing.buffermanagement.IBufferPool;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.common.utilities.Ensure;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import org.slf4j.Logger;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -24,13 +22,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by junbo_xu on 2016/3/11.
  */
 public class SocketRemotingClient {
+    private static final Logger logger = ENodeLogger.getLog();
+
     private static InetAddress localAddress;
 
     static {
@@ -46,7 +49,6 @@ public class SocketRemotingClient {
     private List<IConnectionEventListener> _connectionEventListeners;
     private ConcurrentMap<Long, ResponseFuture> _responseFutureDict;
     private IScheduleService _scheduleService;
-    private ILogger _logger;
     private NettyClientConfig _nettyClientConfig;
 
     private SocketAddress _serverEndPoint;
@@ -55,19 +57,20 @@ public class SocketRemotingClient {
     private AtomicBoolean _reconnecting = new AtomicBoolean(false);
     private boolean _shutteddown = false;
 
-    public SocketRemotingClient() {
-        this(new InetSocketAddress(localAddress, 5000), null, null);
+    public SocketRemotingClient(IScheduleService scheduleService) {
+        this(new InetSocketAddress(localAddress, 5000), null, null, scheduleService);
     }
 
-    public SocketRemotingClient(SocketAddress serverEndPoint) {
-        this(serverEndPoint, null, null);
+    public SocketRemotingClient(SocketAddress serverEndPoint, IScheduleService scheduleService) {
+        this(serverEndPoint, null, null, scheduleService);
     }
 
-    public SocketRemotingClient(SocketAddress serverEndPoint, SocketAddress localEndPoint) {
-        this(serverEndPoint, null, localEndPoint);
+    public SocketRemotingClient(SocketAddress serverEndPoint, SocketAddress localEndPoint, IScheduleService scheduleService) {
+        this(serverEndPoint, null, localEndPoint, scheduleService);
     }
 
-    public SocketRemotingClient(SocketAddress serverEndPoint, NettyClientConfig nettyClientConfig, SocketAddress localEndPoint) {
+    public SocketRemotingClient(SocketAddress serverEndPoint, NettyClientConfig nettyClientConfig,
+                                SocketAddress localEndPoint, IScheduleService scheduleService) {
         Ensure.notNull(serverEndPoint, "serverEndPoint");
 
         _serverEndPoint = serverEndPoint;
@@ -78,8 +81,7 @@ public class SocketRemotingClient {
 //        _replyMessageQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         _responseHandlerDict = new HashMap<>();
         _connectionEventListeners = new ArrayList<>();
-        _scheduleService = ObjectContainer.resolve(IScheduleService.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(SocketRemotingClient.class);
+        _scheduleService = scheduleService;
 
         registerConnectionEventListener(new ConnectionEventListener(this));
     }
@@ -177,17 +179,15 @@ public class SocketRemotingClient {
             if (responseHandler != null) {
                 responseHandler.handleResponse(remotingResponse);
             } else {
-                _logger.error("No response handler found for remoting response:%s", remotingResponse);
+                logger.error("No response handler found for remoting response:{}", remotingResponse);
             }
         } else if (remotingResponse.getType() == RemotingRequestType.Async) {
             ResponseFuture responseFuture = _responseFutureDict.get(remotingResponse.getSequence());
             if (responseFuture != null) {
                 if (responseFuture.setResponse(remotingResponse)) {
-                    if (_logger.isDebugEnabled()) {
-                        _logger.debug("Remoting response back, request code:%d, requect sequence:%d, time spent:%d", responseFuture.getRequest().getCode(), responseFuture.getRequest().getSequence(), System.currentTimeMillis() - responseFuture.getBeginTimestamp());
-                    }
+                    logger.debug("Remoting response back, request code:{}, requect sequence:{}, time spent:{}", responseFuture.getRequest().getCode(), responseFuture.getRequest().getSequence(), System.currentTimeMillis() - responseFuture.getBeginTimestamp());
                 } else {
-                    _logger.error("Set remoting response failed, response:" + remotingResponse);
+                    logger.error("Set remoting response failed, response:" + remotingResponse);
                 }
             }
         }
@@ -206,15 +206,13 @@ public class SocketRemotingClient {
             if (responseFuture != null) {
                 _responseFutureDict.remove(key);
                 responseFuture.setResponse(new RemotingResponse(responseFuture.getRequest().getCode(), (short) 0, responseFuture.getRequest().getType(), timeoutMessage, responseFuture.getRequest().getSequence()));
-                if (_logger.isDebugEnabled()) {
-                    _logger.debug("Removed timeout request:{0}", responseFuture.getRequest());
-                }
+                logger.debug("Removed timeout request:{}", responseFuture.getRequest());
             }
         });
     }
 
     private void reconnectServer() {
-        _logger.info("Try to reconnect to server, address: %s", _serverEndPoint);
+        logger.info("Try to reconnect to server, address: {}", _serverEndPoint);
 
         if (_clientSocket.isConnected()) return;
         if (!enterReconnecting()) return;
@@ -225,7 +223,7 @@ public class SocketRemotingClient {
             _connectionEventListeners.forEach(listener -> _clientSocket.registerConnectionEventListener(listener));
             _clientSocket.start(5000);
         } catch (Exception ex) {
-            _logger.error("Reconnect to server error.", ex);
+            logger.error("Reconnect to server error.", ex);
             exitReconnecting();
         }
     }

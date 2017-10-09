@@ -1,16 +1,13 @@
 package com.qianzhui.enode.common.remoting;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.function.Action1;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.socketing.IConnectionEventListener;
 import com.qianzhui.enode.common.socketing.NettyServerConfig;
 import com.qianzhui.enode.common.socketing.ServerSocket;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
+import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,9 +18,10 @@ import java.util.function.Consumer;
  * Created by junbo_xu on 2016/3/6.
  */
 public class SocketRemotingServer {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private ServerSocket _serverSocket;
     private Map<Integer, IRequestHandler> _requestHandlerDict;
-    private ILogger _logger;
     private NettyServerConfig _nettyServerConfig;
     private boolean _isShuttingdown = false;
 
@@ -35,7 +33,6 @@ public class SocketRemotingServer {
         _nettyServerConfig = (nettyServerConfig == null ? new NettyServerConfig() : nettyServerConfig);
         _serverSocket = new ServerSocket(_nettyServerConfig, this::handleRemotingRequest);
         _requestHandlerDict = new HashMap<>();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(name == null ? SocketRemotingServer.class.getName() : name);
     }
 
     public SocketRemotingServer registerConnectionEventListener(IConnectionEventListener listener) {

@@ -2,13 +2,10 @@ package com.qianzhui.enode.eventing.impl;
 
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.eventing.DomainEventStream;
 import com.qianzhui.enode.eventing.EventAppendResult;
 import com.qianzhui.enode.eventing.IEventStore;
 
-import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -16,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -27,13 +23,10 @@ public class InMemoryEventStore implements IEventStore {
     private static final int UnEditing = 0;
     private ConcurrentMap<String, AggregateInfo> _aggregateInfoDict;
     private boolean _supportBatchAppendEvent;
-    private final ILogger _logger;
 
-    @Inject
-    public InMemoryEventStore(ILoggerFactory loggerFactory) {
+    public InMemoryEventStore() {
         _aggregateInfoDict = new ConcurrentHashMap<>();
         _supportBatchAppendEvent = true;
-        _logger= loggerFactory.create(getClass());
     }
 
     public boolean isSupportBatchAppendEvent() {
@@ -58,11 +51,10 @@ public class InMemoryEventStore implements IEventStore {
         return aggregateInfo.getEventDict().entrySet().stream().filter(x -> x.getKey() >= min && x.getKey() <= max).map(x -> x.getValue()).collect(Collectors.toList());
     }
 
-    public CompletableFuture<AsyncTaskResult<EventAppendResult>> batchAppendAsync(List<DomainEventStream> eventStreams)
-    {
+    public CompletableFuture<AsyncTaskResult<EventAppendResult>> batchAppendAsync(List<DomainEventStream> eventStreams) {
         BatchAppendFuture batchAppendFuture = new BatchAppendFuture();
 
-        for(int i= 0,len=eventStreams.size();i<len;i++){
+        for (int i = 0, len = eventStreams.size(); i < len; i++) {
             CompletableFuture<AsyncTaskResult<EventAppendResult>> task = appendAsync(eventStreams.get(i));
 
             batchAppendFuture.addTask(task);
@@ -77,33 +69,33 @@ public class InMemoryEventStore implements IEventStore {
         private ConcurrentMap<Integer, CompletableFuture<AsyncTaskResult<EventAppendResult>>> taskDict;
         private CompletableFuture<AsyncTaskResult<EventAppendResult>> result;
 
-        public BatchAppendFuture(){
+        public BatchAppendFuture() {
             index = new AtomicInteger(0);
             result = new CompletableFuture<>();
         }
 
-        public void addTask(CompletableFuture<AsyncTaskResult<EventAppendResult>> task){
+        public void addTask(CompletableFuture<AsyncTaskResult<EventAppendResult>> task) {
             int i = index.get();
 
             taskDict.put(index.getAndIncrement(), task);
-            task.thenAccept(t->{
-                if(t.getData() != EventAppendResult.Success){
+            task.thenAccept(t -> {
+                if (t.getData() != EventAppendResult.Success) {
                     result.complete(t);
                     taskDict.clear();
                     return;
                 }
 
-                if(!result.isDone()){
+                if (!result.isDone()) {
                     taskDict.remove(i);
 
-                    if(taskDict.isEmpty()){
+                    if (taskDict.isEmpty()) {
                         result.complete(new AsyncTaskResult<EventAppendResult>(AsyncTaskStatus.Success, EventAppendResult.Success));
                     }
                 }
             });
         }
 
-        public CompletableFuture<AsyncTaskResult<EventAppendResult>> result(){
+        public CompletableFuture<AsyncTaskResult<EventAppendResult>> result() {
             return result;
         }
     }
@@ -126,7 +118,7 @@ public class InMemoryEventStore implements IEventStore {
 
     private EventAppendResult append(DomainEventStream eventStream) {
 //        AggregateInfo aggregateInfo = _aggregateInfoDict.putIfAbsent(eventStream.aggregateRootId(), new AggregateInfo());
-        AggregateInfo aggregateInfo = _aggregateInfoDict.computeIfAbsent(eventStream.aggregateRootId(), key->new AggregateInfo());
+        AggregateInfo aggregateInfo = _aggregateInfoDict.computeIfAbsent(eventStream.aggregateRootId(), key -> new AggregateInfo());
 
         boolean editing = aggregateInfo.tryEnterEditing();
         if (!editing) {

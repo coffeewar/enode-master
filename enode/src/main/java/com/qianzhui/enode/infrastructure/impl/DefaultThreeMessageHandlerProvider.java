@@ -1,10 +1,12 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.eventing.IDomainEvent;
 import com.qianzhui.enode.infrastructure.IMessageHandler;
 import com.qianzhui.enode.infrastructure.IMessageHandlerProxy3;
 import com.qianzhui.enode.infrastructure.IThreeMessageHandlerProvider;
 
+import javax.inject.Inject;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -13,6 +15,13 @@ import java.util.List;
  * Created by junbo_xu on 2016/4/3.
  */
 public class DefaultThreeMessageHandlerProvider extends AbstractHandlerProvider<ManyType, IMessageHandlerProxy3, List<Class>> implements IThreeMessageHandlerProvider {
+    private IObjectContainer objectContainer;
+
+    @Inject
+    public DefaultThreeMessageHandlerProvider(IObjectContainer objectContainer) {
+        this.objectContainer = objectContainer;
+    }
+
     @Override
     protected Class getHandlerType() {
         return IMessageHandler.class;
@@ -30,7 +39,7 @@ public class DefaultThreeMessageHandlerProvider extends AbstractHandlerProvider<
 
     @Override
     protected boolean isHandlerSourceMatchKey(List<Class> handlerSource, ManyType key) {
-        if(handlerSource.size() != 3)
+        if (handlerSource.size() != 3)
             return false;
 
         for (Class type : key.getTypes()) {
@@ -49,5 +58,10 @@ public class DefaultThreeMessageHandlerProvider extends AbstractHandlerProvider<
                 && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[0])
                 && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[1])
                 && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[2]);
+    }
+
+    @Override
+    protected IObjectContainer getObjectContainer() {
+        return objectContainer;
     }
 }

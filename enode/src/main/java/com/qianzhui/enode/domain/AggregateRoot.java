@@ -5,6 +5,7 @@ import com.qianzhui.enode.common.function.Action2;
 import com.qianzhui.enode.eventing.DomainEventStream;
 import com.qianzhui.enode.eventing.IDomainEvent;
 
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * Created by junbo_xu on 2016/2/24.
  */
 public abstract class AggregateRoot<TAggregateRootId> implements IAggregateRoot {
+    @Inject
     private static IAggregateRootInternalHandlerProvider _eventHandlerProvider;
     private int _version;
     private List<IDomainEvent> _uncommittedEvents;

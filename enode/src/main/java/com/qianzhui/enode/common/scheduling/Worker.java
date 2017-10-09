@@ -1,18 +1,18 @@
 package com.qianzhui.enode.common.scheduling;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.function.Action;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
+import org.slf4j.Logger;
 
 /**
  * Created by junbo_xu on 2016/3/12.
  */
 public class Worker {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private Object _lockObject = new Object();
     private String _actionName;
     private Action _action;
-    private ILogger _logger;
     private Status _status;
 
     public String actionName() {
@@ -23,7 +23,6 @@ public class Worker {
         _actionName = actionName;
         _action = action;
         _status = Status.Initial;
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(this.getClass());
     }
 
     public Worker start() {
@@ -55,8 +54,8 @@ public class Worker {
     private void loop() {
         while (this._status.equals(Status.Running)) {
             if (Thread.interrupted()) {
-                _logger.info("Worker thread caught ThreadAbortException, try to resetting, actionName:%s", _actionName);
-                _logger.info("Worker thread ThreadAbortException resetted, actionName:%s", _actionName);
+                _logger.info("Worker thread caught ThreadAbortException, try to resetting, actionName:{}", _actionName);
+                _logger.info("Worker thread ThreadAbortException resetted, actionName:{}", _actionName);
             }
             try {
                 _action.apply();

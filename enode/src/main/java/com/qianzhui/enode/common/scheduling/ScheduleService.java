@@ -1,10 +1,9 @@
 package com.qianzhui.enode.common.scheduling;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.function.Action;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
+import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,14 +16,13 @@ import java.util.concurrent.TimeUnit;
  * Created by junbo_xu on 2016/3/11.
  */
 public class ScheduleService implements IScheduleService {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private Object _lockObject = new Object();
     private Map<String, TimerBasedTask> _taskDict = new HashMap<>();
     private ScheduledExecutorService scheduledThreadPool;
-    private ILogger _logger;
 
     public ScheduleService() {
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(ScheduleService.class);
-
         scheduledThreadPool = Executors.newScheduledThreadPool(2,
                 new ThreadFactoryBuilder().setDaemon(true).setNameFormat("ScheduleService-%d").build());
     }

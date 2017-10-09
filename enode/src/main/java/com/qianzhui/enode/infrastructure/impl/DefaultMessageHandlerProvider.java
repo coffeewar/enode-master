@@ -1,16 +1,25 @@
 package com.qianzhui.enode.infrastructure.impl;
 
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.infrastructure.IMessage;
 import com.qianzhui.enode.infrastructure.IMessageHandler;
 import com.qianzhui.enode.infrastructure.IMessageHandlerProvider;
 import com.qianzhui.enode.infrastructure.IMessageHandlerProxy1;
 
+import javax.inject.Inject;
 import java.lang.reflect.Method;
 
 /**
  * Created by junbo_xu on 2016/3/31.
  */
 public class DefaultMessageHandlerProvider extends AbstractHandlerProvider<Class, IMessageHandlerProxy1, Class> implements IMessageHandlerProvider {
+    private IObjectContainer objectContainer;
+
+    @Inject
+    public DefaultMessageHandlerProvider(IObjectContainer objectContainer) {
+        this.objectContainer = objectContainer;
+    }
+
     @Override
     protected Class getHandlerType() {
         return IMessageHandler.class;
@@ -36,5 +45,10 @@ public class DefaultMessageHandlerProvider extends AbstractHandlerProvider<Class
         return method.getName().equals("handleAsync")
                 && method.getParameterTypes().length == 1
                 && IMessage.class.isAssignableFrom(method.getParameterTypes()[0]);
+    }
+
+    @Override
+    protected IObjectContainer getObjectContainer() {
+        return objectContainer;
     }
 }

@@ -1,7 +1,8 @@
 package com.qianzhui.enode.eventing.impl;
 
-import com.qianzhui.enode.common.logging.ILogger;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.eventing.EventCommittingContext;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -16,7 +17,8 @@ import java.util.function.Consumer;
  * Created by junbo_xu on 2016/4/23.
  */
 public class EventMailBox {
-    private final ILogger _logger;
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final String _aggregateRootId;
     private final Queue<EventCommittingContext> _messageQueue;
     private final Consumer<List<EventCommittingContext>> _handleMessageAction;
@@ -28,13 +30,12 @@ public class EventMailBox {
         return _aggregateRootId;
     }
 
-    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction, ILogger logger) {
+    public EventMailBox(String aggregateRootId, int batchSize, Consumer<List<EventCommittingContext>> handleMessageAction) {
         _aggregateRootId = aggregateRootId;
         _messageQueue = new ConcurrentLinkedQueue<>();
         _batchSize = batchSize;
         _handleMessageAction = handleMessageAction;
         _isRunning = new AtomicBoolean(false);
-        _logger = logger;
         _lastActiveTime = new Date();
     }
 

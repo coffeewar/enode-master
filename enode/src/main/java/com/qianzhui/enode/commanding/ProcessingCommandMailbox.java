@@ -1,8 +1,9 @@
 package com.qianzhui.enode.commanding;
 
 import com.qianzhui.enode.ENode;
-import com.qianzhui.enode.common.logging.ILogger;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.threading.ManualResetEvent;
+import org.slf4j.Logger;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -16,7 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Created by junbo_xu on 2016/4/22.
  */
 public class ProcessingCommandMailbox {
-    private final ILogger _logger;
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final Object _lockObj = new Object();
     private final Object _lockObj2 = new Object();
     private final String _aggregateRootId;
@@ -38,7 +40,7 @@ public class ProcessingCommandMailbox {
         return _aggregateRootId;
     }
 
-    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandHandler messageHandler, ILogger logger) {
+    public ProcessingCommandMailbox(String aggregateRootId, IProcessingCommandHandler messageHandler) {
         _messageDict = new ConcurrentHashMap<>();
         _requestToCompleteCommandDict = new HashMap<>();
         _pauseWaitHandle = new ManualResetEvent(false);
@@ -46,7 +48,6 @@ public class ProcessingCommandMailbox {
         _batchSize = ENode.getInstance().getSetting().getCommandMailBoxPersistenceMaxBatchSize();
         _aggregateRootId = aggregateRootId;
         _messageHandler = messageHandler;
-        _logger = logger;
         _consumedSequence = -1;
         _isRunning = new AtomicBoolean(false);
         _lastActiveTime = new Date();
@@ -70,7 +71,7 @@ public class ProcessingCommandMailbox {
         _lastActiveTime = new Date();
         _pauseWaitHandle.reset();
         while (_isProcessingCommand) {
-            _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: {}", _aggregateRootId);
             _processingWaitHandle.waitOne(1000);
         }
         _isPaused = true;
@@ -114,7 +115,7 @@ public class ProcessingCommandMailbox {
     public void run() {
         _lastActiveTime = new Date();
         while (_isPaused) {
-            _logger.info("Command mailbox is pausing and we should wait for a while, aggregateRootId: %s", _aggregateRootId);
+            _logger.info("Command mailbox is pausing and we should wait for a while, aggregateRootId: {}", _aggregateRootId);
             _pauseWaitHandle.waitOne(1000);
         }
 

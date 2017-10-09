@@ -1,17 +1,12 @@
 package com.qianzhui.enode.rocketmq.publishableexceptions;
 
 import com.alibaba.rocketmq.common.message.Message;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.IMessagePublisher;
 import com.qianzhui.enode.infrastructure.IPublishableException;
 import com.qianzhui.enode.infrastructure.ISequenceMessage;
-import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
@@ -29,24 +24,21 @@ import java.util.concurrent.CompletableFuture;
 public class PublishableExceptionPublisher implements IMessagePublisher<IPublishableException> {
     private final IJsonSerializer _jsonSerializer;
     private final ITopicProvider<IPublishableException> _exceptionTopicProvider;
-    private final ITypeNameProvider _typeNameProvider;
     private final Producer _producer;
     private final SendQueueMessageService _sendMessageService;
-    private final ILogger _logger;
 
     public Producer getProducer() {
         return _producer;
     }
 
     @Inject
-    public PublishableExceptionPublisher(Producer producer) {
+    public PublishableExceptionPublisher(Producer producer, IJsonSerializer jsonSerializer,
+                                         ITopicProvider<IPublishableException> exceptionITopicProvider,
+                                         SendQueueMessageService sendQueueMessageService) {
         _producer = producer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _exceptionTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
-        });
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _sendMessageService = new SendQueueMessageService();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+        _jsonSerializer = jsonSerializer;
+        _exceptionTopicProvider = exceptionITopicProvider;
+        _sendMessageService = sendQueueMessageService;
     }
 
     public PublishableExceptionPublisher start() {

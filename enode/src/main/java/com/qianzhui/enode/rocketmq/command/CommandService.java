@@ -3,16 +3,11 @@ package com.qianzhui.enode.rocketmq.command;
 import com.alibaba.rocketmq.common.message.Message;
 import com.alibaba.rocketmq.common.message.MessageConst;
 import com.qianzhui.enode.commanding.*;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.common.utilities.Ensure;
-import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 import com.qianzhui.enode.rocketmq.ITopicProvider;
 import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
@@ -32,10 +27,8 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/3/1.
  */
 public class CommandService implements ICommandService {
-    private ILogger _logger;
     private IJsonSerializer _jsonSerializer;
     private ITopicProvider<ICommand> _commandTopicProvider;
-    private ITypeNameProvider _typeNameProvider;
     private ICommandRoutingKeyProvider _commandRouteKeyProvider;
     private SendQueueMessageService _sendMessageService;
     private CommandResultProcessor _commandResultProcessor;
@@ -43,17 +36,19 @@ public class CommandService implements ICommandService {
     private ICommandKeyProvider _commandKeyProvider;
 
     @Inject
-    public CommandService(CommandResultProcessor commandResultProcessor, Producer producer) {
+    public CommandService(IJsonSerializer jsonSerializer,
+                          ITopicProvider<ICommand> commandTopicProvider,
+                          CommandResultProcessor commandResultProcessor,
+                          ICommandRoutingKeyProvider commandRoutingKeyProvider,
+                          Producer producer,
+                          SendQueueMessageService sendQueueMessageService) {
         super();
+        _jsonSerializer = jsonSerializer;
+        _commandTopicProvider = commandTopicProvider;
+        _commandRouteKeyProvider = commandRoutingKeyProvider;
         _commandResultProcessor = commandResultProcessor;
         _producer = producer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _commandTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
-        });
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _commandRouteKeyProvider = ObjectContainer.resolve(ICommandRoutingKeyProvider.class);
-        _sendMessageService = new SendQueueMessageService();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(CommandService.class);
+        _sendMessageService = sendQueueMessageService;
         _commandKeyProvider = new CommandKeyProvider();
     }
 

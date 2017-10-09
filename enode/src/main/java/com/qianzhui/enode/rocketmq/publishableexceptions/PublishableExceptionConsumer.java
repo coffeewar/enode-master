@@ -1,15 +1,13 @@
 package com.qianzhui.enode.rocketmq.publishableexceptions;
 
 import com.alibaba.rocketmq.common.message.MessageExt;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.*;
 import com.qianzhui.enode.rocketmq.*;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 
@@ -18,35 +16,23 @@ import javax.inject.Inject;
  * Created by junbo_xu on 2016/4/6.
  */
 public class PublishableExceptionConsumer {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final RocketMQConsumer _consumer;
     private final IJsonSerializer _jsonSerializer;
     private final ITopicProvider<IPublishableException> _exceptionTopicProvider;
     private final ITypeNameProvider _typeNameProvider;
     private final IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException> _publishableExceptionProcessor;
-    private final ILogger _logger;
 
     @Inject
     public PublishableExceptionConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer,
                                         ITopicProvider<IPublishableException> exceptionITopicProvider, ITypeNameProvider typeNameProvider,
-                                        IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException> publishableExceptionProcessor,
-                                        ILoggerFactory loggerFactory) {
+                                        IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException> publishableExceptionProcessor) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
         _exceptionTopicProvider = exceptionITopicProvider;
         _typeNameProvider = typeNameProvider;
         _publishableExceptionProcessor = publishableExceptionProcessor;
-        _logger = loggerFactory.create(getClass());
-    }
-
-    public PublishableExceptionConsumer(RocketMQConsumer consumer) {
-        _consumer = consumer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _exceptionTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IPublishableException>>() {
-        });
-        _publishableExceptionProcessor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingPublishableExceptionMessage, IPublishableException>>() {
-        });
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
     }
 
     public PublishableExceptionConsumer start() {
@@ -91,7 +77,7 @@ public class PublishableExceptionConsumer {
 
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingPublishableExceptionMessage processingMessage = new ProcessingPublishableExceptionMessage(exception, processContext);
-        _logger.info("ENode exception message received, messageId: %s, aggregateRootId: %s, aggregateRootType: %s", exceptionMessage.getUniqueId(), exceptionMessage.getAggregateRootId(), exceptionMessage.getAggregateRootTypeName());
+        _logger.info("ENode exception message received, messageId: {}, aggregateRootId: {}, aggregateRootType: {}", exceptionMessage.getUniqueId(), exceptionMessage.getAggregateRootId(), exceptionMessage.getAggregateRootTypeName());
         _publishableExceptionProcessor.process(processingMessage);
     }
 

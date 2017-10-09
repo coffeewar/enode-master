@@ -3,10 +3,7 @@ package com.qianzhui.enode.rocketmq.command;
 import com.alibaba.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import com.alibaba.rocketmq.common.message.MessageExt;
 import com.qianzhui.enode.commanding.*;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
@@ -15,7 +12,9 @@ import com.qianzhui.enode.domain.IAggregateStorage;
 import com.qianzhui.enode.domain.IRepository;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.rocketmq.*;
+import org.slf4j.Logger;
 
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +27,8 @@ import java.util.concurrent.ConcurrentMap;
  * Created by junbo_xu on 2016/3/13.
  */
 public class CommandConsumer {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final RocketMQConsumer _consumer;
     private final SendReplyService _sendReplyService;
     private final IJsonSerializer _jsonSerializer;
@@ -36,23 +37,24 @@ public class CommandConsumer {
     private final IRepository _repository;
     private final IAggregateStorage _aggregateRootStorage;
     private final ITopicProvider<ICommand> _commandTopicProvider;
-    private final ILogger _logger;
 
     public RocketMQConsumer getConsumer() {
         return _consumer;
     }
 
-    public CommandConsumer() {
-        _consumer = ObjectContainer.resolve(RocketMQConsumer.class);
-        _sendReplyService = new SendReplyService();
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _processor = ObjectContainer.resolve(ICommandProcessor.class);
-        _repository = ObjectContainer.resolve(IRepository.class);
-        _aggregateRootStorage = ObjectContainer.resolve(IAggregateStorage.class);
-        _commandTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<ICommand>>() {
-        });
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+    @Inject
+    public CommandConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer, ITypeNameProvider typeNameProvider,
+                           ICommandProcessor commandProcessor, IRepository repository,
+                           IAggregateStorage aggregateStorage, ITopicProvider<ICommand> commandTopicProvider,
+                           SendReplyService sendReplyService) {
+        _consumer = consumer;
+        _sendReplyService = sendReplyService;
+        _jsonSerializer = jsonSerializer;
+        _typeNameProvider = typeNameProvider;
+        _processor = commandProcessor;
+        _repository = repository;
+        _aggregateRootStorage = aggregateStorage;
+        _commandTopicProvider = commandTopicProvider;
     }
 
     public CommandConsumer start() {
@@ -88,7 +90,7 @@ public class CommandConsumer {
         CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = new CompletableFuture<>();
         CommandExecuteContext commandExecuteContext = new CommandExecuteContext(_repository, _aggregateRootStorage, msg, context, commandMessage, _sendReplyService, consumeResultFuture);
         commandItems.put("CommandReplyAddress", commandMessage.getReplyAddress());
-        _logger.info("ENode command message received, messageId: %s, aggregateRootId: %s", command.id(), command.getAggregateRootId());
+        _logger.info("ENode command message received, messageId: {}, aggregateRootId: {}", command.id(), command.getAggregateRootId());
         _processor.process(new ProcessingCommand(command, commandExecuteContext, commandItems));
     }
 

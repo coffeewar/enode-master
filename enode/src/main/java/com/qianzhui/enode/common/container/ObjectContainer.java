@@ -8,6 +8,7 @@ import java.util.Properties;
 /**
  * Created by junbo_xu on 2016/2/26.
  */
+@Deprecated
 public class ObjectContainer {
     public static IObjectContainer current;
 

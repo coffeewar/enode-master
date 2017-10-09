@@ -1,11 +1,7 @@
 package com.qianzhui.enode.common.socketing;
 
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.function.Action1;
-import com.qianzhui.enode.common.function.Action2;
 import com.qianzhui.enode.common.function.Action3;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.utilities.Ensure;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -17,14 +13,13 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -33,6 +28,8 @@ import java.util.function.Consumer;
  * Created by junbo_xu on 2016/3/3.
  */
 public class ServerSocket {
+    private static final Logger logger = ENodeLogger.getLog();
+
     private final ServerBootstrap serverBootstrap;
     // 服务器线程组 用于网络事件的处理 一个用于服务器接收客户端的连接
     // 另一个线程组用于处理SocketChannel的网络读写
@@ -46,7 +43,6 @@ public class ServerSocket {
     private int port;
     private List<IConnectionEventListener> connectionEventListeners;
     private Action3<Channel, byte[], Consumer<byte[]>> messageArrivedHandler;
-    private ILogger logger;
 
     public ServerSocket(NettyServerConfig nettyServerConfig, Action3<Channel, byte[], Consumer<byte[]>> messageArrivedHandler) {
         Ensure.notNull(nettyServerConfig, "nettyServerConfig");
@@ -67,23 +63,21 @@ public class ServerSocket {
 
         this.eventLoopGroupWorker =
                 new NioEventLoopGroup(nettyServerConfig.getServerSelectorThreads(), new ThreadFactory() {
-                            private AtomicInteger threadIndex = new AtomicInteger(0);
-                            private int threadTotal = nettyServerConfig.getServerSelectorThreads();
+                    private AtomicInteger threadIndex = new AtomicInteger(0);
+                    private int threadTotal = nettyServerConfig.getServerSelectorThreads();
 
 
-                            @Override
-                            public Thread newThread(Runnable r) {
-                                return new Thread(r, String.format("NettyServerSelector_%d_%d", threadTotal,
-                                        this.threadIndex.incrementAndGet()));
-                            }
-                        }
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        return new Thread(r, String.format("NettyServerSelector_%d_%d", threadTotal,
+                                this.threadIndex.incrementAndGet()));
+                    }
+                }
                 );
 
         this.nettyServerConfig = nettyServerConfig;
         this.connectionEventListeners = new ArrayList<>();
         this.messageArrivedHandler = messageArrivedHandler;
-
-        this.logger = ObjectContainer.resolve(ILoggerFactory.class).create(ServerSocket.class);
     }
 
     public void registerConnectionEventListener(IConnectionEventListener listener) {
@@ -154,13 +148,13 @@ public class ServerSocket {
         defaultEventExecutorGroup.shutdownGracefully();
         eventLoopGroupBoss.shutdownGracefully();
         eventLoopGroupWorker.shutdownGracefully();
-        logger.info("Socket server shutdown, listening TCP endpoint: %d.", port);
+        logger.info("Socket server shutdown, listening TCP endpoint: {}.", port);
     }
 
     private void onSocketAccepted(Channel channel) {
         CompletableFuture.supplyAsync(() -> {
             try {
-                logger.info("Socket accepted, remote endpoint:%s", channel.remoteAddress());
+                logger.info("Socket accepted, remote endpoint:{}", channel.remoteAddress());
 
                 connectionEventListeners.forEach(listener -> {
                     try {

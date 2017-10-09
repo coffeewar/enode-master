@@ -1,10 +1,7 @@
 package com.qianzhui.enode.rocketmq.applicationmessage;
 
 import com.alibaba.rocketmq.common.message.MessageExt;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
@@ -13,6 +10,7 @@ import com.qianzhui.enode.infrastructure.IMessageProcessor;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 import com.qianzhui.enode.infrastructure.ProcessingApplicationMessage;
 import com.qianzhui.enode.rocketmq.*;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 
@@ -21,35 +19,23 @@ import javax.inject.Inject;
  */
 public class ApplicationMessageConsumer {
 
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private final RocketMQConsumer _consumer;
     private final IJsonSerializer _jsonSerializer;
     private final ITopicProvider<IApplicationMessage> _messageTopicProvider;
     private final ITypeNameProvider _typeNameProvider;
     private final IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage> _processor;
-    private final ILogger _logger;
 
     @Inject
     public ApplicationMessageConsumer(RocketMQConsumer consumer, IJsonSerializer jsonSerializer,
                                       ITopicProvider<IApplicationMessage> messageITopicProvider, ITypeNameProvider typeNameProvider,
-                                      IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage> processor,
-                                      ILoggerFactory loggerFactory) {
+                                      IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage> processor) {
         _consumer = consumer;
         _jsonSerializer = jsonSerializer;
         _messageTopicProvider = messageITopicProvider;
         _typeNameProvider = typeNameProvider;
         _processor = processor;
-        _logger = loggerFactory.create(getClass());
-    }
-
-    public ApplicationMessageConsumer(RocketMQConsumer consumer) {
-        _consumer = consumer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _messageTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
-        });
-        _processor = ObjectContainer.resolve(new GenericTypeLiteral<IMessageProcessor<ProcessingApplicationMessage, IApplicationMessage>>() {
-        });
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
     }
 
     public ApplicationMessageConsumer start() {
@@ -86,7 +72,7 @@ public class ApplicationMessageConsumer {
         IApplicationMessage message = (IApplicationMessage) _jsonSerializer.deserialize(appDataMessage.getApplicationMessageData(), applicationMessageType);
         RocketMQProcessContext processContext = new RocketMQProcessContext(msg, context);
         ProcessingApplicationMessage processingMessage = new ProcessingApplicationMessage(message, processContext);
-        _logger.info("ENode application message received, messageId: %s, routingKey: %s", message.id(), message.getRoutingKey());
+        _logger.info("ENode application message received, messageId: {}, routingKey: {}", message.id(), message.getRoutingKey());
         _processor.process(processingMessage);
 //        return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }

@@ -2,14 +2,12 @@ package com.qianzhui.enode.eventing.impl;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.qianzhui.enode.ENode;
-import com.qianzhui.enode.commanding.CommandAddResult;
-import com.qianzhui.enode.common.container.ObjectContainer;
+import com.qianzhui.enode.common.container.IObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
 import com.qianzhui.enode.common.io.IOHelper;
 import com.qianzhui.enode.common.io.IORuntimeException;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.Ensure;
 import com.qianzhui.enode.configurations.DefaultDBConfigurationSetting;
@@ -19,10 +17,10 @@ import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.BeanHandler;
 import org.apache.commons.dbutils.handlers.BeanListHandler;
+import org.slf4j.Logger;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -34,6 +32,8 @@ import java.util.stream.Collectors;
  * Created by junbo_xu on 2016/3/20.
  */
 public class MysqlEventStore implements IEventStore {
+    private static final Logger _logger = ENodeLogger.getLog();
+
     private static final String EventTableNameFormat = "{0}_{1}";
 
     private final String _tableName;
@@ -45,12 +45,11 @@ public class MysqlEventStore implements IEventStore {
     private final IJsonSerializer _jsonSerializer;
     private final IEventSerializer _eventSerializer;
     private final IOHelper _ioHelper;
-    private final ILogger _logger;
     private final QueryRunner _queryRunner;
     private boolean _supportBatchAppendEvent;
     private Executor executor;
 
-    public MysqlEventStore(DataSource ds, OptionSetting optionSetting) {
+    public MysqlEventStore(DataSource ds, OptionSetting optionSetting, IObjectContainer objectContainer) {
         Ensure.notNull(ds, "ds");
         if (optionSetting != null) {
             _tableName = optionSetting.getOptionValue("TableName");
@@ -76,10 +75,9 @@ public class MysqlEventStore implements IEventStore {
         Ensure.positive(_bulkCopyBatchSize, "_bulkCopyBatchSize");
         Ensure.positive(_bulkCopyTimeout, "_bulkCopyTimeout");
 
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _eventSerializer = ObjectContainer.resolve(IEventSerializer.class);
-        _ioHelper = ObjectContainer.resolve(IOHelper.class);
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+        _jsonSerializer = objectContainer.resolve(IJsonSerializer.class);
+        _eventSerializer = objectContainer.resolve(IEventSerializer.class);
+        _ioHelper = objectContainer.resolve(IOHelper.class);
         _queryRunner = new QueryRunner(ds);
         executor = Executors.newFixedThreadPool(4,
                 new ThreadFactoryBuilder().setDaemon(true).setNameFormat("MysqlEventStoreExecutor-%d").build());

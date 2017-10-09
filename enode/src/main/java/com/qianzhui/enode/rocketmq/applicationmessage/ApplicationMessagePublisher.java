@@ -1,11 +1,7 @@
 package com.qianzhui.enode.rocketmq.applicationmessage;
 
 import com.alibaba.rocketmq.common.message.Message;
-import com.qianzhui.enode.common.container.GenericTypeLiteral;
-import com.qianzhui.enode.common.container.ObjectContainer;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
 import com.qianzhui.enode.common.utilities.BitConverter;
 import com.qianzhui.enode.infrastructure.IApplicationMessage;
@@ -30,21 +26,21 @@ public class ApplicationMessagePublisher implements IMessagePublisher<IApplicati
     private final ITypeNameProvider _typeNameProvider;
     private final Producer _producer;
     private final SendQueueMessageService _sendMessageService;
-    private final ILogger _logger;
 
     public Producer getProducer() {
         return _producer;
     }
 
     @Inject
-    public ApplicationMessagePublisher(Producer producer) {
+    public ApplicationMessagePublisher(Producer producer, IJsonSerializer jsonSerializer,
+                                       ITopicProvider<IApplicationMessage> messageITopicProvider,
+                                       ITypeNameProvider typeNameProvider,
+                                       SendQueueMessageService sendQueueMessageService) {
         _producer = producer;
-        _jsonSerializer = ObjectContainer.resolve(IJsonSerializer.class);
-        _messageTopicProvider = ObjectContainer.resolve(new GenericTypeLiteral<ITopicProvider<IApplicationMessage>>() {
-        });
-        _typeNameProvider = ObjectContainer.resolve(ITypeNameProvider.class);
-        _sendMessageService = new SendQueueMessageService();
-        _logger = ObjectContainer.resolve(ILoggerFactory.class).create(getClass());
+        _jsonSerializer = jsonSerializer;
+        _messageTopicProvider = messageITopicProvider;
+        _typeNameProvider = typeNameProvider;
+        _sendMessageService = sendQueueMessageService;
     }
 
     public ApplicationMessagePublisher start() {
