@@ -5,7 +5,7 @@
     <parent>
         <artifactId>notesample</artifactId>
         <groupId>com.qianzhui.enode.samples.notesample</groupId>
-        <version>1.2-SNAPSHOT</version>
+        <version>1.4-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -15,13 +15,13 @@
         <dependency>
             <groupId>com.qianzhui.enode.samples.notesample</groupId>
             <artifactId>domain</artifactId>
-            <version>1.2-SNAPSHOT</version>
+            <version>1.4-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>com.qianzhui.enode.samples.notesample</groupId>
             <artifactId>commands</artifactId>
-            <version>1.2-SNAPSHOT</version>
+            <version>1.4-SNAPSHOT</version>
         </dependency>
     </dependencies>
 </project>

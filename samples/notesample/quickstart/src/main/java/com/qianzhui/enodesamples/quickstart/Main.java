@@ -4,8 +4,6 @@ import com.qianzhui.enode.ENode;
 import com.qianzhui.enode.commanding.CommandReturnType;
 import com.qianzhui.enode.commanding.ICommandService;
 import com.qianzhui.enode.common.container.ObjectContainer;
-import com.qianzhui.enode.common.logging.ILogger;
-import com.qianzhui.enode.common.logging.ILoggerFactory;
 import com.qianzhui.enode.rocketmq.client.impl.NativePropertyKey;
 import com.qianzhui.enode.rocketmq.client.ons.PropertyKeyConst;
 import com.qianzhui.enodesamples.notesample.commands.ChangeNoteTitleCommand;
@@ -80,7 +78,6 @@ public class Main {
 
         enode.start();
 
-        ILogger _logger = ObjectContainer.resolve(ILoggerFactory.class).create(Main.class);
         ICommandService commandService = ObjectContainer.resolve(ICommandService.class);
         String noteId = UUID.randomUUID().toString();
         CreateNoteCommand command1 = new CreateNoteCommand(noteId, "Sample Title1");
@@ -91,7 +88,7 @@ public class Main {
         commandService.executeAsync(command1, CommandReturnType.EventHandled).get();
         commandService.executeAsync(command2, CommandReturnType.EventHandled).get();
 
-        _logger.info("Press Enter to exit...");
+        System.out.println("Press Enter to exit...");
 
         System.in.read();
         enode.shutdown();
