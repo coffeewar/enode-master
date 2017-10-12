@@ -104,6 +104,9 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
     }
 
     private void checkRepublishUnpublishedEventAsync(IAggregateRoot aggregateRoot, int retryTimes) {
+        if(aggregateRoot == null)
+            return;
+
         _ioHelper.tryAsyncActionRecursively("CheckRepublishUnpublishedEventAsync",
                 () -> _publishedVersionStore.getPublishedVersionAsync(ENode.getInstance().getSetting().getDomainEventStreamMessageHandlerName(),
                         _typeNameProvider.getTypeName(aggregateRoot.getClass()), aggregateRoot.uniqueId()),
