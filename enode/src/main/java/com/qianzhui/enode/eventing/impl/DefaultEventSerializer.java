@@ -6,10 +6,7 @@ import com.qianzhui.enode.eventing.IEventSerializer;
 import com.qianzhui.enode.infrastructure.ITypeNameProvider;
 
 import javax.inject.Inject;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by junbo_xu on 2016/3/20.
@@ -47,6 +44,10 @@ public class DefaultEventSerializer implements IEventSerializer {
 
             evnts.add(evnt);
         });
+
+        Collections.sort(evnts, (e1, e2)->
+            e1.sequence() - e2.sequence()
+        );
 
         return evnts;
     }
