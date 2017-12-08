@@ -1,9 +1,6 @@
 package com.qianzhui.enode.rocketmq.trace.core.dispatch.impl;
 
-/**
- * Created by junbo_xu on 2016/10/17.
- */
-
+import com.alibaba.rocketmq.client.exception.MQClientException;
 import com.alibaba.rocketmq.client.log.ClientLogger;
 import com.qianzhui.enode.rocketmq.trace.core.common.OnsTraceConstants;
 import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncAppender;
@@ -21,7 +18,8 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * 异步提交消息轨迹等数据
  */
-public class AsyncTraceDispatcher extends AsyncDispatcher {
+@Deprecated
+public class AsyncTraceDispatcher implements AsyncDispatcher {
     private final static Logger clientlog = ClientLogger.getLog();
     // RingBuffer 实现，size 必须为 2 的 n 次方
     private final Object[] entries;
@@ -45,9 +43,10 @@ public class AsyncTraceDispatcher extends AsyncDispatcher {
 
     private Thread worker;
     private AtomicBoolean running;
+    private volatile Thread shutDownHook;
 
-
-    public AsyncTraceDispatcher(Properties properties) {
+    public AsyncTraceDispatcher(Properties properties) throws MQClientException {
+        appender = new AsyncTraceAppender(properties);
         int queueSize = Integer.parseInt(properties.getProperty(OnsTraceConstants.AsyncBufferSize, "2048"));
         // queueSize 取大于或等于 value 的 2 的 n 次方数
         queueSize = 1 << (32 - Integer.numberOfLeadingZeros(queueSize - 1));
@@ -69,22 +68,17 @@ public class AsyncTraceDispatcher extends AsyncDispatcher {
         this.notEmpty = lock.newCondition();
     }
 
-
-    @Override
-    public void start(AsyncAppender appender, String workerName) {
-        this.appender = appender;
+    public void start(String workerName) {
         this.workerName = workerName;
-
         this.worker = new Thread(new AsyncRunnable(), "MQ-AsyncDispatcher-Thread-" + workerName);
         this.worker.setDaemon(true);
         this.worker.start();
+        this.registerShutdownHook();
     }
-
 
     public int size() {
         return (int) (putIndex.get() - takeIndex.get());
     }
-
 
     /**
      * 队列满时直接丢弃数据，不阻塞业务线程，返回日志是否被接受
@@ -118,7 +112,6 @@ public class AsyncTraceDispatcher extends AsyncDispatcher {
         }
     }
 
-
     @Override
     public void flush() throws IOException {
         // 最多等待刷新的时间，避免数据一直在写导致无法返回
@@ -145,23 +138,36 @@ public class AsyncTraceDispatcher extends AsyncDispatcher {
     }
 
     @Override
-    public void registerShutDownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-            private volatile boolean hasShutdown = false;
+    public void shutdown() {
+        this.removeShutDownHook();
+    }
 
-            @Override
-            public void run() {
-                synchronized (this) {
-                    if (!this.hasShutdown) {
-                        try {
-                            flush();
-                        } catch (IOException e) {
-                            clientlog.error("system mqtrace hook shutdown failed ,maybe loss some trace data");
+    public void registerShutdownHook() {
+        if (shutDownHook == null) {
+            shutDownHook = new Thread(new Runnable() {
+                private volatile boolean hasShutdown = false;
+
+                @Override
+                public void run() {
+                    synchronized (this) {
+                        if (!this.hasShutdown) {
+                            try {
+                                flush();
+                            } catch (IOException e) {
+                                clientlog.error("system mqtrace hook shutdown failed ,maybe loss some trace data");
+                            }
                         }
                     }
                 }
-            }
-        }, "ShutdownHookMQTrace"));
+            }, "ShutdownHookMQTrace");
+            Runtime.getRuntime().addShutdownHook(shutDownHook);
+        }
+    }
+
+    public void removeShutDownHook() {
+        if (shutDownHook != null) {
+            Runtime.getRuntime().removeShutdownHook(shutDownHook);
+        }
     }
 
     class AsyncRunnable implements Runnable {
@@ -203,7 +209,8 @@ public class AsyncTraceDispatcher extends AsyncDispatcher {
                             --size;
                             // 调用消费程序进行消费
                             parent.appender.append(ctx);
-                        } while (size > 0);
+                        }
+                        while (size > 0);
                         // 集中flush
                         parent.appender.flush();
                         long discardNum = discardCount.get();

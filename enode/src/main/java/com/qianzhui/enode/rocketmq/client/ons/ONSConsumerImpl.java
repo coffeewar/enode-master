@@ -8,6 +8,7 @@ import com.qianzhui.enode.rocketmq.client.Consumer;
 import com.qianzhui.enode.rocketmq.client.MQClientInitializer;
 import com.qianzhui.enode.rocketmq.client.RocketMQClientException;
 import com.qianzhui.enode.rocketmq.trace.core.common.OnsTraceConstants;
+import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 import com.qianzhui.enode.rocketmq.trace.core.dispatch.impl.AsyncArrayDispatcher;
 import com.qianzhui.enode.rocketmq.trace.core.utils.OnsConsumeMessageHookImpl;
 import org.slf4j.Logger;
@@ -19,6 +20,8 @@ import java.util.Properties;
  */
 public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
     private static final Logger logger = ENodeLogger.getLog();
+
+    protected AsyncDispatcher traceDispatcher;
 
     public ONSConsumerImpl(Properties properties) {
         super(properties, new ONSClientInitializer());
@@ -63,7 +66,7 @@ public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
             tempProperties.put(OnsTraceConstants.NAMESRV_ADDR, mqClientInitializer.getNameServerAddr());
             tempProperties.put(OnsTraceConstants.InstanceName, mqClientInitializer.buildIntanceName());
             traceDispatcher = new AsyncArrayDispatcher(tempProperties);
-            traceDispatcher.start(null, defaultMQPushConsumer.getInstanceName());
+            traceDispatcher.start(defaultMQPushConsumer.getInstanceName());
             defaultMQPushConsumer.getDefaultMQPushConsumerImpl().registerConsumeMessageHook(
                     new OnsConsumeMessageHookImpl(traceDispatcher));
         } catch (Throwable e) {
@@ -71,5 +74,14 @@ public class ONSConsumerImpl extends AbstractConsumer implements Consumer {
         }
 
         return defaultMQPushConsumer;
+    }
+
+    @Override
+    public void shutdown() {
+        super.shutdown();
+
+        if (null != traceDispatcher) {
+            traceDispatcher.shutdown();
+        }
     }
 }

@@ -15,6 +15,7 @@ import com.qianzhui.enode.rocketmq.client.ons.FAQ;
 import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by junbo_xu on 2016/4/20.
@@ -22,7 +23,7 @@ import java.util.Properties;
 public abstract class AbstractProducer {
     private final DefaultMQProducer defaultMQProducer;
 
-    protected AsyncDispatcher traceDispatcher = null;
+    protected final AtomicBoolean started = new AtomicBoolean(false);
 
     abstract protected DefaultMQProducer initProducer(Properties properties, MQClientInitializer mqClientInitializer);
 
@@ -34,18 +35,18 @@ public abstract class AbstractProducer {
 
     public void start() {
         try {
-            this.defaultMQProducer.start();
+            if (this.started.compareAndSet(false, true)) {
+                this.defaultMQProducer.start();
+            }
         } catch (Exception e) {
-            throw new RocketMQClientException(e.getMessage(), e);
-        }
-
-        if(this.traceDispatcher!=null){
-            this.traceDispatcher.registerShutDownHook();
+            throw new RocketMQClientException(e.getMessage());
         }
     }
 
     public void shutdown() {
-        this.defaultMQProducer.shutdown();
+        if (this.started.compareAndSet(true, false)) {
+            this.defaultMQProducer.shutdown();
+        }
     }
 
     public SendResult send(Message message, MessageQueueSelector selector, Object arg) {

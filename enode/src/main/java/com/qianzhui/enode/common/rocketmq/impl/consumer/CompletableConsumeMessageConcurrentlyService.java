@@ -16,6 +16,7 @@ import com.alibaba.rocketmq.common.message.MessageQueue;
 import com.alibaba.rocketmq.common.protocol.body.CMResult;
 import com.alibaba.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 import com.alibaba.rocketmq.remoting.common.RemotingHelper;
+import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableConsumeConcurrentlyContext;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableMessageListenerConcurrently;
 import com.qianzhui.enode.common.utilities.CompletableFutureUtil;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -32,6 +34,7 @@ import java.util.concurrent.*;
  */
 public class CompletableConsumeMessageConcurrentlyService implements ConsumeMessageService {
     private static final Logger log = ClientLogger.getLog();
+    private static final Logger enodeLog = ENodeLogger.getLog();
     private final DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
     private final DefaultMQPushConsumer defaultMQPushConsumer;
     private final CompletableMessageListenerConcurrently messageListener;
@@ -110,6 +113,7 @@ public class CompletableConsumeMessageConcurrentlyService implements ConsumeMess
                 consumeMessageContext
                         .setConsumerGroup(CompletableConsumeMessageConcurrentlyService.this.defaultMQPushConsumer
                                 .getConsumerGroup());
+                consumeMessageContext.setProps(new HashMap<>());
                 consumeMessageContext.setMq(messageQueue);
                 consumeMessageContext.setMsgList(msgs);
                 consumeMessageContext.setSuccess(false);
@@ -139,15 +143,23 @@ public class CompletableConsumeMessageConcurrentlyService implements ConsumeMess
                 return;
             }
 
-//            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofSeconds(20));
+            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofMinutes(5));
 
-            statusFuture.handle((status,e)->{
+            consumeResultFuture.handle((status,e)->{
                 if(e!=null){
                     log.warn("consumeMessage exception: {} Group: {} Msgs: {} MQ: {}",//
                             RemotingHelper.exceptionSimpleDesc(e),//
                             CompletableConsumeMessageConcurrentlyService.this.consumerGroup,//
                             msgs,//
                             messageQueue);
+
+                    if(e.getCause() instanceof TimeoutException) {
+                        enodeLog.error("consumeMessage timeout: {} Group: {} Msgs: {} MQ: {}",
+                                RemotingHelper.exceptionSimpleDesc(e.getCause()),//
+                                CompletableConsumeMessageConcurrentlyService.this.consumerGroup,//
+                                msgs,//
+                                messageQueue);
+                    }
                 }
 
                 long consumeRT = System.currentTimeMillis() - beginTimestamp;

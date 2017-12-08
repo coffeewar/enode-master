@@ -4,9 +4,9 @@ import com.alibaba.rocketmq.client.consumer.listener.MessageListenerConcurrently
 import com.alibaba.rocketmq.client.exception.MQClientException;
 import com.qianzhui.enode.common.rocketmq.consumer.CompletableDefaultMQPushConsumer;
 import com.qianzhui.enode.common.rocketmq.consumer.listener.CompletableMessageListenerConcurrently;
-import com.qianzhui.enode.rocketmq.trace.core.dispatch.AsyncDispatcher;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Created by junbo_xu on 2016/4/21.
@@ -15,7 +15,7 @@ public abstract class AbstractConsumer {
 
     private final CompletableDefaultMQPushConsumer defaultMQPushConsumer;
 
-    protected AsyncDispatcher traceDispatcher=null;
+    protected final AtomicBoolean started = new AtomicBoolean(false);
 
     abstract protected CompletableDefaultMQPushConsumer initConsumer(Properties properties, MQClientInitializer mqClientInitializer);
 
@@ -27,18 +27,18 @@ public abstract class AbstractConsumer {
 
     public void start() {
         try {
-            this.defaultMQPushConsumer.start();
+            if (this.started.compareAndSet(false, true)) {
+                this.defaultMQPushConsumer.start();
+            }
         } catch (Exception e) {
-            throw new RocketMQClientException(e.getMessage(), e);
-        }
-
-        if(this.traceDispatcher!=null){
-            this.traceDispatcher.registerShutDownHook();
+            throw new RocketMQClientException(e.getMessage());
         }
     }
 
     public void shutdown() {
-        this.defaultMQPushConsumer.shutdown();
+        if (this.started.compareAndSet(true, false)) {
+            this.defaultMQPushConsumer.shutdown();
+        }
     }
 
     public void registerMessageListener(MessageListenerConcurrently messageListener) {

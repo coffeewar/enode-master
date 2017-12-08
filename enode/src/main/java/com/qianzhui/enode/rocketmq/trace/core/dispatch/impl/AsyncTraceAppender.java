@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import java.util.*;
 
 /**
- * Created by junbo_xu on 2016/10/17.
+ * Created by alvin on 16-3-7.
  */
 public class AsyncTraceAppender extends AsyncAppender {
     private final static Logger clientlog = ClientLogger.getLog();
@@ -44,17 +44,15 @@ public class AsyncTraceAppender extends AsyncAppender {
      */
     private StringBuilder buffer;
 
-
     /**
      * 构造消息类型的轨迹数据发送器
      *
-     * @param properties
-     *            参数属性
+     * @param properties 参数属性
      * @throws MQClientException
      */
     public AsyncTraceAppender(Properties properties) throws MQClientException {
-        buffer=new StringBuilder(10240);
-        transDataList = new ArrayList<OnsTraceTransferBean>();
+        buffer = new StringBuilder(10240);
+        transDataList = new ArrayList<>();
         SessionCredentials sessionCredentials = new SessionCredentials();
         Properties sessionProperties = new Properties();
         sessionProperties.put("AccessKey", properties.getProperty(OnsTraceConstants.AccessKey));
@@ -80,7 +78,6 @@ public class AsyncTraceAppender extends AsyncAppender {
         traceProducer.start();
     }
 
-
     /**
      * 往消息缓冲区编码轨迹数据
      *
@@ -97,7 +94,6 @@ public class AsyncTraceAppender extends AsyncAppender {
         transDataList.add(traceData);
     }
 
-
     /**
      * 实际批量发送数据
      */
@@ -106,9 +102,9 @@ public class AsyncTraceAppender extends AsyncAppender {
         if (transDataList.size() == 0) {
             return;
         }
-        int currentBatch =transDataList.size()>batchSize?batchSize:batchSize;
+        int currentBatch = transDataList.size() > batchSize ? batchSize : batchSize;
         // 临时缓冲区
-        buffer.delete(0,buffer.length());
+        buffer.delete(0, buffer.length());
         int count = 0;
         Set<String> keySet = new HashSet<String>();
 
@@ -117,7 +113,7 @@ public class AsyncTraceAppender extends AsyncAppender {
             buffer.append(bean.getTransData());
             count++;
             // 保证包的大小不要超过上限
-            if (count >=currentBatch || buffer.length() >= traceProducer.getMaxMessageSize()) {
+            if (count >= currentBatch || buffer.length() >= traceProducer.getMaxMessageSize()) {
                 sendTraceDataByMQ(keySet, buffer.toString());
                 // 发送完成，清除临时缓冲区
                 buffer.delete(0, buffer.length());
@@ -131,14 +127,11 @@ public class AsyncTraceAppender extends AsyncAppender {
         this.transDataList.clear();
     }
 
-
     /**
      * 发送数据的接口
      *
-     * @param keySet
-     *            本批次包含的keyset
-     * @param data
-     *            本批次的轨迹数据
+     * @param keySet 本批次包含的keyset
+     * @param data   本批次的轨迹数据
      */
     public void sendTraceDataByMQ(Set<String> keySet, String data) {
         String topic = OnsTraceConstants.traceTopic + currentRegionId;
@@ -150,16 +143,14 @@ public class AsyncTraceAppender extends AsyncAppender {
                 public void onSuccess(SendResult sendResult) {
                 }
 
-
                 @Override
                 public void onException(Throwable e) {
                     //todo 对于发送失败的数据，如何保存，保证所有轨迹数据都记录下来
-                    clientlog.info("send trace data failed ,the msgidSet is"+message.getKeys());
+                    clientlog.info("send trace data failed ,the msgidSet is" + message.getKeys());
                 }
             }, 5000);
-        }
-        catch (Exception e) {
-            clientlog.info("send trace data failed ,the msgidSet is"+message.getKeys());
+        } catch (Exception e) {
+            clientlog.info("send trace data failed ,the msgidSet is" + message.getKeys());
         }
     }
 

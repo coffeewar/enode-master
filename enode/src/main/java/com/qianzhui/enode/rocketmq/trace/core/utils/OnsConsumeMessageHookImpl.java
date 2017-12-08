@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by junbo_xu on 2016/10/17.
+ * Created by alvin on 16-3-8.
  */
 public class OnsConsumeMessageHookImpl implements ConsumeMessageHook {
     /**
@@ -22,17 +22,14 @@ public class OnsConsumeMessageHookImpl implements ConsumeMessageHook {
      */
     private AsyncDispatcher localDispatcher;
 
-
     public OnsConsumeMessageHookImpl(AsyncDispatcher localDispatcher) {
         this.localDispatcher = localDispatcher;
     }
-
 
     @Override
     public String hookName() {
         return "OnsConsumeMessageHook";
     }
-
 
     @Override
     public void consumeMessageBefore(ConsumeMessageContext context) {
@@ -48,32 +45,33 @@ public class OnsConsumeMessageHookImpl implements ConsumeMessageHook {
             if (msg == null) {
                 continue;
             }
+            String regionId = msg.getProperty(MessageConst.PROPERTY_MSG_REGION);
+            String traceOn = msg.getProperty("TRACE_ON");
+            if (regionId == null || regionId.equals(OnsTraceConstants.default_region)) {
+                // if regionId is default ,skip it
+                continue;
+            }
+            if (traceOn != null && traceOn.equals("false")) {
+                // if trace switch is false ,skip it
+                continue;
+            }
             OnsTraceBean traceBean = new OnsTraceBean();
             traceBean.setTopic(msg.getTopic());//
             traceBean.setMsgId(msg.getMsgId());//
             traceBean.setTags(msg.getTags());//
             traceBean.setKeys(msg.getKeys());//
-//            InetSocketAddress host;
-//            // host = (InetSocketAddress) msg.getBornHost();
-//            // traceBean.setClientHost(host.getHostName());//
-//
-//            host = (InetSocketAddress) msg.getStoreHost();
-//            traceBean.setStoreHost(host.getHostName());//
             traceBean.setStoreTime(msg.getStoreTimestamp());//
             traceBean.setBodyLength(msg.getStoreSize());//
             traceBean.setRetryTimes(msg.getReconsumeTimes());//
-            String regionId = msg.getProperty(MessageConst.PROPERTY_MSG_REGION);
-            if (regionId == null) {
-                regionId = OnsTraceConstants.default_region;
-            }
             onsTraceContext.setRegionId(regionId);//
             beans.add(traceBean);
         }
-        onsTraceContext.setTraceBeans(beans);
-        onsTraceContext.setTimeStamp(System.currentTimeMillis());
-        localDispatcher.append(onsTraceContext);
+        if (beans.size() > 0) {
+            onsTraceContext.setTraceBeans(beans);
+            onsTraceContext.setTimeStamp(System.currentTimeMillis());
+            localDispatcher.append(onsTraceContext);
+        }
     }
-
 
     @Override
     public void consumeMessageAfter(ConsumeMessageContext context) {
@@ -81,6 +79,14 @@ public class OnsConsumeMessageHookImpl implements ConsumeMessageHook {
             return;
         }
         OnsTraceContext subBeforeContext = (OnsTraceContext) context.getMqTraceContext();
+        if (subBeforeContext.getRegionId().equals(OnsTraceConstants.default_region)) {
+            // if regionId is default ,skip it
+            return;
+        }
+        if (subBeforeContext.getTraceBeans() == null || subBeforeContext.getTraceBeans().size() < 1) {
+            // if subbefore bean is null ,skip it
+            return;
+        }
         OnsTraceContext subAfterContext = new OnsTraceContext();
         subAfterContext.setTraceType(OnsTraceType.SubAfter);//
         subAfterContext.setRegionId(subBeforeContext.getRegionId());//
@@ -91,6 +97,33 @@ public class OnsConsumeMessageHookImpl implements ConsumeMessageHook {
         int costTime = (int) ((System.currentTimeMillis() - subBeforeContext.getTimeStamp()) / context.getMsgList().size());
         subAfterContext.setCostTime(costTime);//
         subAfterContext.setTraceBeans(subBeforeContext.getTraceBeans());
+        String contextType = context.getProps().get("ConsumeContextType");
+        if (contextType != null) {
+            subAfterContext.setContextCode(ConsumeReturnType.valueOf(contextType).ordinal());
+        }
         localDispatcher.append(subAfterContext);
+    }
+
+    public enum ConsumeReturnType {
+        /**
+         * consume return success
+         */
+        SUCCESS,
+        /**
+         * consume timeout ,even if success
+         */
+        TIME_OUT,
+        /**
+         * consume throw exception
+         */
+        EXCEPTION,
+        /**
+         * consume return null
+         */
+        RETURNNULL,
+        /**
+         * consume return failed
+         */
+        FAILED
     }
 }

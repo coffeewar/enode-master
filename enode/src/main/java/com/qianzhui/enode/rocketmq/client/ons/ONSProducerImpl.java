@@ -28,11 +28,11 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
     private static final Log log = LogFactory.getLog(ONSProducerImpl.class);
 
     public static void main(String[] args) {
-        startConsumer();
+        //startConsumer();
 
         Properties properties = new Properties();
 
-        properties.put(PropertyKeyConst.ProducerId, "jslink-test");
+        properties.put(PropertyKeyConst.ProducerId, "PID_EnodeCommon");
 
         properties.put(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
 
@@ -41,11 +41,14 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
         ONSProducerImpl producer = new ONSProducerImpl(properties);
 
         producer.start();
+        System.out.println("producer started.");
+        producer.shutdown();
+        System.out.println("producer shutdown.");
 
-        Message msg = new Message(
+        /*Message msg = new Message(
 
                 // Message Topic
-                "jslink-test",
+                "EnodeCommonTopicDev",
                 // Message Tag,
                 // 可理解为Gmail中的标签，对消息进行再归类，方便Consumer指定过滤条件在ONS服务器过滤
                 "Tags",
@@ -56,17 +59,17 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
 
         SendResult sendResult = producer.send(msg, (final List<MessageQueue> mqs, final Message m, final Object arg) -> mqs.get(0), "test");
 
-        System.out.println(sendResult);
+        System.out.println(sendResult);*/
 
         // 在应用退出前，销毁Producer对象
         // 注意：如果不销毁也没有问题
-        producer.shutdown();
+//        producer.shutdown();
     }
 
     private static void startConsumer() {
         Properties properties = new Properties();
 
-        properties.put(PropertyKeyConst.ConsumerId, "CID-jstest");
+        properties.put(PropertyKeyConst.ConsumerId, "CID_NoteSample");
 
         properties.put(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
 
@@ -89,6 +92,8 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
 
         System.out.println("Consumer Started");
     }
+
+    private AsyncDispatcher traceDispatcher;
 
     public ONSProducerImpl(final Properties properties) {
         super(properties, new ONSClientInitializer());
@@ -125,7 +130,7 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
             tempProperties.put(OnsTraceConstants.NAMESRV_ADDR, clientInitializer.getNameServerAddr());
             tempProperties.put(OnsTraceConstants.InstanceName, clientInitializer.buildIntanceName());
             traceDispatcher = new AsyncArrayDispatcher(tempProperties);
-            traceDispatcher.start(null, defaultMQProducer.getInstanceName());
+            traceDispatcher.start(defaultMQProducer.getInstanceName());
             defaultMQProducer.getDefaultMQProducerImpl().registerSendMessageHook(
                     new OnsClientSendMessageHookImpl(traceDispatcher));
         } catch (Throwable e) {
@@ -133,5 +138,14 @@ public class ONSProducerImpl extends AbstractProducer implements Producer {
         }
 
         return defaultMQProducer;
+    }
+
+    @Override
+    public void shutdown() {
+        super.shutdown();
+
+        if (null != traceDispatcher) {
+            traceDispatcher.shutdown();
+        }
     }
 }

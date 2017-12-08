@@ -1,13 +1,18 @@
 package com.qianzhui.enode.rocketmq.trace.core.dispatch;
 
 /**
- * Created by junbo_xu on 2016/10/17.
+ * Created by alvin on 16-3-7.
+ * 数据编码和发送模块
  */
 public abstract class AsyncAppender {
-    public AsyncAppender() {
-    }
+    /**
+     *编码数据上下文到缓冲区
+     * @param context
+     */
+    public abstract void append(Object context);
 
-    public abstract void append(Object var1);
-
+    /**
+     * 实际写数据操作
+     */
     public abstract void flush();
 }
