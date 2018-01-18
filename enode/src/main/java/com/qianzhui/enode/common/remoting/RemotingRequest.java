@@ -13,11 +13,11 @@ public class RemotingRequest extends RemotingMessage {
     }
 
     public RemotingRequest(short code, byte[] body, long sequence) {
-        super(code, body, _sequence.incrementAndGet());
+        super(code, body, sequence);
     }
 
     public RemotingRequest(short code, byte[] body, short type, long sequence) {
-        super(code, body, type, _sequence.incrementAndGet());
+        super(code, body, type, sequence);
     }
 
     @Override
