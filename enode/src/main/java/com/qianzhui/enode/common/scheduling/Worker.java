@@ -14,6 +14,7 @@ public class Worker {
     private String _actionName;
     private Action _action;
     private Status _status;
+    private Thread thread;
 
     public String actionName() {
         return _actionName;
@@ -31,7 +32,7 @@ public class Worker {
 
             _status = Status.Running;
 
-            Thread thread = new Thread(this::loop, String.format("%s.Worker", _actionName));
+            thread = new Thread(this::loop, String.format("%s.Worker", _actionName));
 
             thread.setDaemon(true);
 
@@ -47,18 +48,23 @@ public class Worker {
 
             _status = Status.StopRequested;
 
+            thread.interrupt();
+
+            _logger.info("Worker thread shutdown,thread id:{}", thread.getName());
+
             return this;
         }
     }
 
     private void loop() {
-        while (this._status.equals(Status.Running)) {
-            if (Thread.interrupted()) {
-                _logger.info("Worker thread caught ThreadAbortException, try to resetting, actionName:{}", _actionName);
-                _logger.info("Worker thread ThreadAbortException resetted, actionName:{}", _actionName);
-            }
+        while (this._status == Status.Running) {
             try {
                 _action.apply();
+            } catch (InterruptedException e) {
+                if (_status != Status.StopRequested) {
+                    _logger.info("Worker thread caught ThreadAbortException, try to resetting, actionName:{}", _actionName);
+                    _logger.info("Worker thread ThreadAbortException resetted, actionName:{}", _actionName);
+                }
             } catch (Exception ex) {
                 _logger.error(String.format("Worker thread has exception, actionName:%s", _actionName), ex);
             }
