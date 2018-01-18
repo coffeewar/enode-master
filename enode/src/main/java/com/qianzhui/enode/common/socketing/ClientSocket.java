@@ -130,7 +130,15 @@ public class ClientSocket {
     }
 
     public ClientSocket shutdown() {
-        eventLoopGroupWorker.shutdownGracefully();
+        try {
+            eventLoopGroupWorker.shutdownGracefully();
+
+            if(defaultEventExecutorGroup != null) {
+                defaultEventExecutorGroup.shutdownGracefully();
+            }
+        } catch (Exception e) {
+            logger.error("NettyRemotingClient shutdown exception, ", e);
+        }
         return this;
     }
 
