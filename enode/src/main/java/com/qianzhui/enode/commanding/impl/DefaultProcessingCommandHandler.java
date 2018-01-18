@@ -158,9 +158,15 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         }
         ;
 
-        //如果当前command没有对任何聚合根做修改，则认为当前command已经处理结束，返回command的结果为NothingChanged
+        //如果当前command没有对任何聚合根做修改，框架仍然需要尝试获取该command之前是否有产生事件，
+        //如果有，则需要将事件再次发布到MQ；如果没有，则完成命令，返回command的结果为NothingChanged。
+        //之所以要这样做是因为有可能当前command上次执行的结果可能是事件持久化完成，但是发布到MQ未完成，然后那时正好机器断电宕机了；
+        //这种情况下，如果机器重启，当前command对应的聚合根从eventstore恢复的聚合根是被当前command处理过后的；
+        //所以如果该command再次被处理，可能对应的聚合根就不会再产生事件了；
+        //所以，我们要考虑到这种情况，尝试再次发布该命令产生的事件到MQ；
+        //否则，如果我们直接将当前command设置为完成，即对MQ进行ack操作，那该command的事件就永远不会再发布到MQ了，这样就无法保证CQRS数据的最终一致性了。
         if (dirtyAggregateRootCount == 0 || changedEvents == null || changedEvents.size() == 0) {
-            completeCommand(processingCommand, CommandStatus.NothingChanged, String.class.getName(), context.getResult());
+            processIfNoEventsOfCommand(processingCommand, 0);
             return;
         }
 
@@ -169,6 +175,26 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
 
         //将事件流提交到EventStore
         _eventService.commitDomainEventAsync(new EventCommittingContext(dirtyAggregateRoot, eventStream, processingCommand));
+    }
+
+    private void processIfNoEventsOfCommand(ProcessingCommand processingCommand, int retryTimes) {
+        ICommand command = processingCommand.getMessage();
+
+        _ioHelper.tryAsyncActionRecursively("ProcessIfNoEventsOfCommand",
+                () -> _eventStore.findAsync(command.getAggregateRootId(), command.id()),
+                currentRetryTimes -> processIfNoEventsOfCommand(processingCommand, currentRetryTimes),
+                result ->
+                {
+                    DomainEventStream existingEventStream = result.getData();
+                    if (existingEventStream != null) {
+                        _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
+                    } else {
+                        completeCommand(processingCommand, CommandStatus.NothingChanged, String.class.getName(), processingCommand.getCommandExecuteContext().getResult());
+                    }
+                },
+                () -> String.format("[commandId:%s]", command.id()),
+                errorMessage -> _logger.error("Find event by commandId has unknown exception, the code should not be run to here, errorMessage: {}", errorMessage),
+                retryTimes, true);
     }
 
     private DomainEventStream buildDomainEventStream(IAggregateRoot aggregateRoot, List<IDomainEvent> changedEvents, ProcessingCommand processingCommand) {
@@ -200,7 +226,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                         //之所以要这样做是因为虽然该command产生的事件已经持久化成功，但并不表示已经内存也更新了或者事件已经发布出去了；
                         //因为有可能事件持久化成功了，但那时正好机器断电了，则更新内存和发布事件都没有做；
                         //_memoryCache.refreshAggregateFromEventStore(existingEventStream.aggregateRootTypeName(), existingEventStream.aggregateRootId());
-                        _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.");
+                        _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.", exception);
                         _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
                     } else {
                         //到这里，说明当前command执行遇到异常，然后当前command之前也没执行过，是第一次被执行。
