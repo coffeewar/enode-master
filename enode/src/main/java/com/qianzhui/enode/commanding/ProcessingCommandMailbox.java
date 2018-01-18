@@ -58,6 +58,7 @@ public class ProcessingCommandMailbox {
         synchronized (_lockObj) {
             message.setSequence(_nextSequence);
             message.setMailbox(this);
+            message.setEnqueueTime(new Date());
             ProcessingCommand processingCommand = _messageDict.putIfAbsent(message.getSequence(), message);
             if (processingCommand == null) {
                 _nextSequence++;

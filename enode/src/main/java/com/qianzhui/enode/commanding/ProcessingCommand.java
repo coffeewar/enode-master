@@ -1,5 +1,6 @@
 package com.qianzhui.enode.commanding;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -7,11 +8,12 @@ import java.util.Map;
  * Created by junbo_xu on 2016/3/14.
  */
 public class ProcessingCommand {
-    public ProcessingCommandMailbox mailbox;
-    public long sequence;
-    public ICommand message;
-    public ICommandExecuteContext commandExecuteContext;
-    public Map<String, String> items;
+    private ProcessingCommandMailbox mailbox;
+    private long sequence;
+    private final ICommand message;
+    private final ICommandExecuteContext commandExecuteContext;
+    private final Map<String, String> items;
+    private long enqueueTimestamp;
 
     public ProcessingCommand(ICommand command, ICommandExecuteContext commandExecuteContext, Map<String, String> items) {
         this.message = command;
@@ -49,5 +51,13 @@ public class ProcessingCommand {
 
     public Map<String, String> getItems() {
         return items;
+    }
+
+    public long getEnqueueTimestamp() {
+        return enqueueTimestamp;
+    }
+
+    void setEnqueueTime(Date enqueueTime) {
+        this.enqueueTimestamp = enqueueTime.getTime();
     }
 }
