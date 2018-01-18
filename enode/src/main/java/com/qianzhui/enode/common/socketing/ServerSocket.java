@@ -145,10 +145,17 @@ public class ServerSocket {
     }
 
     public void shutdown() {
-        defaultEventExecutorGroup.shutdownGracefully();
-        eventLoopGroupBoss.shutdownGracefully();
-        eventLoopGroupWorker.shutdownGracefully();
-        logger.info("Socket server shutdown, listening TCP endpoint: {}.", port);
+        try {
+            eventLoopGroupBoss.shutdownGracefully();
+            eventLoopGroupWorker.shutdownGracefully();
+
+            if(defaultEventExecutorGroup != null) {
+                defaultEventExecutorGroup.shutdownGracefully();
+            }
+            logger.info("Socket server shutdown, listening TCP endpoint: {}.", port);
+        } catch (Exception e) {
+            logger.error("NettyRemotingServer shutdown exception, ", e);
+        }
     }
 
     private void onSocketAccepted(Channel channel) {
