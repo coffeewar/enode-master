@@ -7,25 +7,32 @@ import com.qianzhui.enode.commanding.ICommand;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
 import com.qianzhui.enode.common.logging.ENodeLogger;
-import com.qianzhui.enode.common.remoting.*;
 import com.qianzhui.enode.common.scheduling.Worker;
 import com.qianzhui.enode.common.serializing.IJsonSerializer;
-import com.qianzhui.enode.common.socketing.NettyServerConfig;
-import com.qianzhui.enode.common.utilities.BitConverter;
+import com.qianzhui.enode.remoting.RemotingServer;
+import com.qianzhui.enode.remoting.netty.NettyRemotingServer;
+import com.qianzhui.enode.remoting.netty.NettyRequestProcessor;
+import com.qianzhui.enode.remoting.netty.NettyServerConfig;
+import com.qianzhui.enode.remoting.protocol.RemotingCommand;
 import com.qianzhui.enode.rocketmq.CommandReplyType;
 import com.qianzhui.enode.rocketmq.domainevent.DomainEventHandledMessage;
+import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 
 import java.net.SocketAddress;
+import java.nio.charset.Charset;
 import java.util.concurrent.*;
 
 /**
  * Created by junbo_xu on 2016/3/8.
  */
-public class CommandResultProcessor implements IRequestHandler {
+public class CommandResultProcessor implements NettyRequestProcessor {
     private static final Logger _logger = ENodeLogger.getLog();
 
-    private SocketRemotingServer _remotingServer;
+    private static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
+
+    private RemotingServer remotingServer;
+
     private ConcurrentMap<String, CommandTaskCompletionSource> _commandTaskDict;
     private BlockingQueue<CommandResult> _commandExecutedMessageLocalQueue;
     private BlockingQueue<DomainEventHandledMessage> _domainEventHandledMessageLocalQueue;
@@ -37,9 +44,16 @@ public class CommandResultProcessor implements IRequestHandler {
     public SocketAddress _bindingAddress;
 
     public CommandResultProcessor(int listenPort, IJsonSerializer jsonSerializer) {
+//        NettyServerConfig nettyServerConfig = new NettyServerConfig();
+//        nettyServerConfig.setListenPort(listenPort);
+//        _remotingServer = new SocketRemotingServer("CommandResultProcessor.RemotingServer", nettyServerConfig);
         NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(listenPort);
-        _remotingServer = new SocketRemotingServer("CommandResultProcessor.RemotingServer", nettyServerConfig);
+        nettyServerConfig.setServerChannelMaxIdleTimeSeconds(3600);
+        remotingServer = new NettyRemotingServer(nettyServerConfig);
+        remotingServer.registerProcessor(CommandReplyType.CommandExecuted.getValue(), this);
+        remotingServer.registerProcessor(CommandReplyType.DomainEventHandled.getValue(), this);
+
         _commandTaskDict = new ConcurrentHashMap<>();
         _commandExecutedMessageLocalQueue = new LinkedBlockingQueue<>();
         _domainEventHandledMessageLocalQueue = new LinkedBlockingQueue<>();
@@ -68,23 +82,21 @@ public class CommandResultProcessor implements IRequestHandler {
     public CommandResultProcessor start() {
         if (_started) return this;
 
-        _remotingServer.start();
-        _bindingAddress = _remotingServer.getServerSocket().getListeningEndPoint();
+        remotingServer.start();
+        _bindingAddress = remotingServer.bindAddress();
+
         _commandExecutedMessageWorker.start();
         _domainEventHandledMessageWorker.start();
 
-        _remotingServer.registerRequestHandler(CommandReplyType.CommandExecuted.getValue(), this);
-        _remotingServer.registerRequestHandler(CommandReplyType.DomainEventHandled.getValue(), this);
-
         _started = true;
 
-        _logger.info("Command result processor started, bindingAddress: {}", _remotingServer.getServerSocket().getListeningEndPoint());
+        _logger.info("Command result processor started, bindingAddress: {}", remotingServer.bindAddress());
 
         return this;
     }
 
     public CommandResultProcessor shutdown() {
-        _remotingServer.shutdown();
+        remotingServer.shutdown();
         _commandExecutedMessageWorker.stop();
         _domainEventHandledMessageWorker.stop();
         return this;
@@ -94,19 +106,25 @@ public class CommandResultProcessor implements IRequestHandler {
         return _bindingAddress;
     }
 
-    public RemotingResponse handleRequest(IRequestHandlerContext context, RemotingRequest remotingRequest) {
-        if (remotingRequest.getCode() == CommandReplyType.CommandExecuted.ordinal()) {
-            String json = BitConverter.toString(remotingRequest.getBody());
-            CommandResult result = _jsonSerializer.deserialize(json, CommandResult.class);
+    @Override
+    public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request) throws Exception {
+        if(request.getCode() == CommandReplyType.CommandExecuted.getValue()) {
+            String body = new String(request.getBody(), CHARSET_UTF8);
+            CommandResult result = _jsonSerializer.deserialize(body, CommandResult.class);
             _commandExecutedMessageLocalQueue.add(result);
-        } else if (remotingRequest.getCode() == CommandReplyType.DomainEventHandled.ordinal()) {
-            String json = BitConverter.toString(remotingRequest.getBody());
-            DomainEventHandledMessage message = _jsonSerializer.deserialize(json, DomainEventHandledMessage.class);
+        } else if(request.getCode() == CommandReplyType.DomainEventHandled.getValue()) {
+            String body = new String(request.getBody(), CHARSET_UTF8);
+            DomainEventHandledMessage message = _jsonSerializer.deserialize(body, DomainEventHandledMessage.class);
             _domainEventHandledMessageLocalQueue.add(message);
-        } else {
-            _logger.error("Invalid remoting request code: {}", remotingRequest.getCode());
+        }else {
+            _logger.error("Invalid remoting request: {}", request);
         }
         return null;
+    }
+
+    @Override
+    public boolean rejectRequest() {
+        return false;
     }
 
     private void processExecutedCommandMessage(CommandResult commandResult) {

@@ -143,23 +143,15 @@ public class CompletableConsumeMessageConcurrentlyService implements ConsumeMess
                 return;
             }
 
-            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofMinutes(5));
+//            CompletableFuture<ConsumeConcurrentlyStatus> consumeResultFuture = CompletableFutureUtil.within(statusFuture, Duration.ofMinutes(5));
 
-            consumeResultFuture.handle((status,e)->{
+            statusFuture.handle((status,e)->{
                 if(e!=null){
                     log.warn("consumeMessage exception: {} Group: {} Msgs: {} MQ: {}",//
                             RemotingHelper.exceptionSimpleDesc(e),//
                             CompletableConsumeMessageConcurrentlyService.this.consumerGroup,//
                             msgs,//
                             messageQueue);
-
-                    if(e.getCause() instanceof TimeoutException) {
-                        enodeLog.error("consumeMessage timeout: {} Group: {} Msgs: {} MQ: {}",
-                                RemotingHelper.exceptionSimpleDesc(e.getCause()),//
-                                CompletableConsumeMessageConcurrentlyService.this.consumerGroup,//
-                                msgs,//
-                                messageQueue);
-                    }
                 }
 
                 long consumeRT = System.currentTimeMillis() - beginTimestamp;

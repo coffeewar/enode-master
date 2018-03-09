@@ -182,10 +182,90 @@ public class MysqlEventStore implements IEventStore {
 
     }
 
+    public static void main(String[] args) throws InterruptedException {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        future.complete("test");
+
+        CompletableFuture<String> future1 = future.thenApply(v -> {
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println(v);
+            return "1" + v;
+        });
+
+        CompletableFuture<String> future2 = future.thenApply(v -> {
+            try {
+                Thread.sleep(10000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println(v);
+            return "2" + v;
+        });
+
+        future1.handleAsync((r,e)->{
+            System.out.println(r);
+            return null;
+        });
+
+        future2.handleAsync((r,e)->{
+            System.out.println(r);
+            return null;
+        });
+
+        Thread.sleep(20000);
+    }
+
+    private ThreadLocal<CompletableFuture<?>> lastFutureThreadLocal = new ThreadLocal<CompletableFuture<?>>(){
+        @Override
+        protected CompletableFuture<?> initialValue() {
+            CompletableFuture<?> completableFuture = new CompletableFuture<>();
+            completableFuture.complete(null);
+            return completableFuture;
+        }
+    };
+
     public CompletableFuture<AsyncTaskResult<EventAppendResult>> appendAsync(DomainEventStream eventStream) {
         StreamRecord record = convertTo(eventStream);
 
-        return _ioHelper.tryIOFuncAsync(() ->
+        return _ioHelper.tryIOFuncAsync(() -> {
+            CompletableFuture<?> lastTask = lastFutureThreadLocal.get();
+
+            CompletableFuture<AsyncTaskResult<EventAppendResult>> future = lastTask.thenApply(result -> {
+                try {
+                    _queryRunner.update(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(record.getAggregateRootId())),
+                            record.getAggregateRootId(),
+                            record.getAggregateRootTypeName(),
+                            record.getCommandId(),
+                            record.getVersion(),
+                            record.getCreatedOn(),
+                            record.getEvents());
+
+                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.Success);
+                } catch (SQLException ex) {
+                    if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
+                        return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
+                    } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
+                        return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
+                    }
+
+                    _logger.error(String.format("Append event has sql exception, eventStream: %s", eventStream), ex);
+                    return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
+                } catch (Exception ex) {
+                    _logger.error(String.format("Append event has unknown exception, eventStream: %s", eventStream), ex);
+                    return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
+                }
+            });
+
+            lastFutureThreadLocal.set(future);
+
+            return future;
+        }, "AppendEventsAsync");
+
+        /*return _ioHelper.tryIOFuncAsync(() ->
                         CompletableFuture.supplyAsync(() -> {
                             try {
                                 _queryRunner.update(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(record.getAggregateRootId())),
@@ -211,7 +291,7 @@ public class MysqlEventStore implements IEventStore {
                                 return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
                             }
                         }, executor)
-                , "AppendEventsAsync");
+                , "AppendEventsAsync");*/
     }
 
     public CompletableFuture<AsyncTaskResult<DomainEventStream>> findAsync(String aggregateRootId, int version) {
@@ -225,7 +305,7 @@ public class MysqlEventStore implements IEventStore {
 
                                 DomainEventStream stream = record != null ? convertFrom(record) : null;
 
-                                return new AsyncTaskResult(AsyncTaskStatus.Success, stream);
+                                return new AsyncTaskResult<>(AsyncTaskStatus.Success, stream);
                             } catch (SQLException ex) {
                                 _logger.error(String.format("Find event by version has sql exception, aggregateRootId: %s, version: %d", aggregateRootId, version), ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage());
@@ -248,7 +328,7 @@ public class MysqlEventStore implements IEventStore {
                                         commandId);
 
                                 DomainEventStream stream = record != null ? convertFrom(record) : null;
-                                return new AsyncTaskResult(AsyncTaskStatus.Success, stream);
+                                return new AsyncTaskResult<>(AsyncTaskStatus.Success, stream);
                             } catch (SQLException ex) {
                                 _logger.error(String.format("Find event by commandId has sql exception, aggregateRootId: %s, commandId: %s", aggregateRootId, commandId), ex);
                                 return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage());

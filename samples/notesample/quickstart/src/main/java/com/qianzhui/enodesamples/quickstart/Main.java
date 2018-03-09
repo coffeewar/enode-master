@@ -32,14 +32,14 @@ public class Main {
 
         /**============= Enode所需消息队列配置，ONS实现 ======*/
         producerSetting = new Properties();
-        producerSetting.setProperty(PropertyKeyConst.ProducerId, "PID_NoteSample");
-        producerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey");
-        producerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey");
+        producerSetting.setProperty(PropertyKeyConst.ProducerId, "PID_EnodeCommon");
+        producerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
+        producerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
 
         consumerSetting = new Properties();
         consumerSetting.setProperty(PropertyKeyConst.ConsumerId, "CID_NoteSample");
-        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "AccessKey");
-        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "SecretKey");
+        consumerSetting.setProperty(PropertyKeyConst.AccessKey, "G6aUujQD6m1Uyy68");
+        consumerSetting.setProperty(PropertyKeyConst.SecretKey, "TR6MUs6R8dK6GTOKudmaaY80K2dmxI");
         /**=============================================================*/
 
         /**============= Enode数据库配置（内存实现不需要配置） ===========*/
@@ -62,15 +62,17 @@ public class Main {
                 .registerDefaultComponents()
                 .useMysqlComponents(dataSource); // 注销此行，启用内存实现（CommandStore,EventStore,SequenceMessagePublishedVersionStore,MessageHandleRecordStore）
 
-        if(isONS) {
-            enode.useONS(producerSetting,consumerSetting,6000,ENode.COMMAND_SERVICE
-                    | ENode.DOMAIN_EVENT_PUBLISHER
-                    | ENode.DOMAIN_EVENT_CONSUMER
-                    | ENode.COMMAND_CONSUMER
-                    | ENode.EXCEPTION_PUBLISHER
-                    | ENode.EXCEPTION_CONSUMER);
+        if (isONS) {
+            enode.useONS(producerSetting, consumerSetting, 6000,
+                    ENode.COMMAND_SERVICE
+                            | ENode.DOMAIN_EVENT_PUBLISHER
+                            | ENode.DOMAIN_EVENT_CONSUMER
+                            | ENode.COMMAND_CONSUMER
+                            | ENode.EXCEPTION_PUBLISHER
+                            | ENode.EXCEPTION_CONSUMER
+            );
         } else {
-            enode.useNativeRocketMQ(producerSetting,consumerSetting,6000,ENode.COMMAND_SERVICE
+            enode.useNativeRocketMQ(producerSetting, consumerSetting, 6000, ENode.COMMAND_SERVICE
                     | ENode.DOMAIN_EVENT_PUBLISHER
                     | ENode.DOMAIN_EVENT_CONSUMER
                     | ENode.COMMAND_CONSUMER);

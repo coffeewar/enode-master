@@ -1,0 +1,55 @@
+ext.maven_username="junbo_xu"
+ext.maven_password="coffee"
+
+allprojects {
+    group = 'com.qianzhui.enode'
+    version = '1.4-SNAPSHOT'
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    sourceCompatibility=1.8
+    targetCompatibility=1.8
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
+
+    dependencies {
+        testCompile 'junit:junit:4.12'
+    }
+
+    repositories {
+        mavenLocal()
+        maven {
+            name 'Nexus repository'
+            url 'http://test.jishulink.com:8081/nexus/content/groups/public'
+        }
+        mavenCentral()
+    }
+
+    apply plugin:'maven'
+    uploadArchives {
+        repositories {
+            mavenDeployer {
+                snapshotRepository(url:"http://test.jishulink.com:8081/nexus/content/repositories/snapshots") {
+                    authentication(userName:"${maven_username}", password:"${maven_password}")
+                }
+                repository(url: "http://test.jishulink.com:8081/nexus/content/repositories/releases") {
+                    authentication(userName: "${maven_username}", password: "${maven_password}")
+                }
+
+                pom.project {
+                    version project.version
+                    artifactId project.name
+                    groupId project.group
+                }
+                /*pom.version = "${project.version}"
+                pom.artifactId = "${project.archivesBaseName}"
+                pom.groupId = "${project.group}"*/
+            }
+        }
+    }
+}
+

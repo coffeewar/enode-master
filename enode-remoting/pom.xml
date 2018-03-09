@@ -3,33 +3,28 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>notesample</artifactId>
-        <groupId>com.qianzhui.enode.samples.notesample</groupId>
+        <artifactId>enode-master</artifactId>
+        <groupId>com.qianzhui.enode</groupId>
         <version>1.4-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>quickstart</artifactId>
+    <artifactId>enode-remoting</artifactId>
 
     <dependencies>
-
-
         <dependency>
-            <groupId>com.qianzhui.enode.samples.notesample</groupId>
-            <artifactId>commands</artifactId>
-            <version>1.2-SNAPSHOT</version>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
-
         <dependency>
-            <groupId>com.qianzhui.enode.samples.notesample</groupId>
-            <artifactId>commandhandlers</artifactId>
-            <version>1.2-SNAPSHOT</version>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
+
 </project>
