@@ -1,7 +1,6 @@
 package com.qianzhui.enode.domain.impl;
 
 import com.qianzhui.enode.common.function.Action2;
-import com.qianzhui.enode.domain.AggregateRoot;
 import com.qianzhui.enode.domain.IAggregateRoot;
 import com.qianzhui.enode.domain.IAggregateRootInternalHandlerProvider;
 import com.qianzhui.enode.eventing.IDomainEvent;
@@ -11,8 +10,8 @@ import com.qianzhui.enode.infrastructure.WrappedRuntimeException;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,16 +28,43 @@ public class DefaultAggregateRootInternalHandlerProvider implements IAggregateRo
 
     @Override
     public void initialize(Set<Class<?>> componentTypes) {
-        componentTypes.stream().filter(TypeUtils::isAggregateRoot).forEach(aggregateRootType ->
-                Arrays.asList(aggregateRootType.getDeclaredMethods()).stream()
-                        .filter(method ->
-                                method.getName().equals(HANDLE_METHOD_NAME)
-                                        && method.getParameterTypes().length == 1
-                                        && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[0])
-                        )
-                        .forEach(method -> registerInternalHandler(aggregateRootType, method.getParameterTypes()[0], method)
-                        )
-        );
+        componentTypes.stream().filter(TypeUtils::isAggregateRoot).forEach(this::recurseRegisterInternalHandler);
+    }
+
+    private void recurseRegisterInternalHandler(Class aggregateRootType) {
+        Class superclass = aggregateRootType.getSuperclass();
+
+        if(!isInterfaceOrObjectClass(superclass)) {
+            registerInternalHandlerWithSuperclass(aggregateRootType, superclass);
+        }
+
+        register(aggregateRootType, aggregateRootType);
+    }
+
+    private void registerInternalHandlerWithSuperclass(Class aggregateRootType, Class parentType) {
+        Class superclass = parentType.getSuperclass();
+
+        if (!isInterfaceOrObjectClass(superclass)) {
+            registerInternalHandlerWithSuperclass(aggregateRootType, superclass);
+        }
+
+        register(aggregateRootType, parentType);
+
+    }
+
+    private boolean isInterfaceOrObjectClass(Class type) {
+        return Modifier.isInterface(type.getModifiers()) || type.equals(Object.class);
+    }
+
+    private void register(Class aggregateRootType, Class type) {
+        Arrays.asList(type.getDeclaredMethods()).stream()
+                .filter(method ->
+                        method.getName().equals(HANDLE_METHOD_NAME)
+                                && method.getParameterTypes().length == 1
+                                && IDomainEvent.class.isAssignableFrom(method.getParameterTypes()[0])
+                )
+                .forEach(method -> registerInternalHandler(aggregateRootType, method.getParameterTypes()[0], method)
+                );
     }
 
     private void registerInternalHandler(Class aggregateRootType, Class eventType, Method method) {
@@ -49,9 +75,9 @@ public class DefaultAggregateRootInternalHandlerProvider implements IAggregateRo
             _mappings.put(aggregateRootType, eventHandlerDic);
         }
 
-        if (eventHandlerDic.containsKey(eventType)) {
-            throw new RuntimeException(String.format("Found duplicated event handler on aggregate, aggregate type:%s, event type:%s", aggregateRootType.getClass().getName(), eventType.getClass().getName()));
-        }
+//        if (eventHandlerDic.containsKey(eventType)) {
+//            throw new RuntimeException(String.format("Found duplicated event handler on aggregate, aggregate type:%s, event type:%s", aggregateRootType.getClass().getName(), eventType.getClass().getName()));
+//        }
 
         try {
             //转换为MethodHandle提高效率
