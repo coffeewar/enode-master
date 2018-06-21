@@ -160,7 +160,6 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
 
         _ioHelper.tryAsyncActionRecursively("HandleSingleMessageAsync",
                 () -> handlerProxy.handleAsync(message),
-                currentRetryTimes -> handleSingleMessageAsync(singleMessageDispatching, handlerProxy, handlerTypeName, messageTypeName, queueHandler, currentRetryTimes),
                 result ->
                 {
                     singleMessageDispatching.removeHandledHandler(handlerTypeName);
@@ -173,7 +172,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 errorMessage ->
                         _logger.error(String.format("Handle single message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
-                retryTimes, true);
+                true);
     }
 
     private void handleTwoMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy2 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy2> queueHandler, int retryTimes) {
@@ -183,7 +182,6 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
 
         _ioHelper.tryAsyncActionRecursively("HandleTwoMessageAsync",
                 () -> handlerProxy.handleAsync(message1, message2),
-                currentRetryTimes -> handleTwoMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler, currentRetryTimes),
                 result ->
                 {
                     multiMessageDispatching.removeHandledHandler(handlerTypeName);
@@ -196,7 +194,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 errorMessage ->
                         _logger.error(String.format("Handle two message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage))
                 ,
-                retryTimes, true);
+                true);
     }
 
     private void handleThreeMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy3 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy3> queueHandler, int retryTimes) {
@@ -207,7 +205,6 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
 
         _ioHelper.tryAsyncActionRecursively("HandleThreeMessageAsync",
                 () -> handlerProxy.handleAsync(message1, message2, message3),
-                currentRetryTimes -> handleThreeMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler, currentRetryTimes),
                 result ->
                 {
                     multiMessageDispatching.removeHandledHandler(handlerTypeName);
@@ -219,7 +216,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 },
                 () -> String.format("[messages:%s, handlerType:{1}]", String.join("|", Arrays.asList(messages).stream().map(x -> String.format("id:%s,type:%s", x.id(), x.getClass().getName())).collect(Collectors.toList())), handlerProxy.getInnerObject().getClass().getName()),
                 errorMessage -> _logger.error(String.format("Handle three message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes, true);
+                true);
     }
 
     class RootDisptaching {

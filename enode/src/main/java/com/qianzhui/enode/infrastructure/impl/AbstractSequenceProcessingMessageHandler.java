@@ -37,7 +37,6 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
 
         _ioHelper.tryAsyncActionRecursively("GetPublishedVersionAsync",
                 () -> _publishedVersionStore.getPublishedVersionAsync(getName(), message.aggregateRootTypeName(), message.aggregateRootStringId()),
-                currentRetryTimes -> handleMessageAsync(processingMessage, currentRetryTimes),
                 result ->
                 {
                     Integer publishedVersion = result.getData();
@@ -55,27 +54,23 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 errorMessage ->
 
                         _logger.error(String.format("Get published version has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes,
                 true);
     }
 
     private void dispatchProcessingMessageAsync(X processingMessage, int retryTimes) {
         _ioHelper.tryAsyncActionRecursively("DispatchProcessingMessageAsync",
                 () -> dispatchProcessingMessageAsync(processingMessage),
-                currentRetryTimes -> dispatchProcessingMessageAsync(processingMessage, currentRetryTimes),
                 result -> updatePublishedVersionAsync(processingMessage, 0),
                 () -> String.format("sequence message [messageId:%s, messageType:%s, aggregateRootId:%s, aggregateRootVersion:%d]", processingMessage.getMessage().id(), processingMessage.getMessage().getClass().getName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
                 errorMessage ->
 
                         _logger.error(String.format("Dispatching message has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes,
                 true);
     }
 
     private void updatePublishedVersionAsync(X processingMessage, int retryTimes) {
         _ioHelper.tryAsyncActionRecursively("UpdatePublishedVersionAsync",
                 () -> _publishedVersionStore.updatePublishedVersionAsync(getName(), processingMessage.getMessage().aggregateRootTypeName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
-                currentRetryTimes -> updatePublishedVersionAsync(processingMessage, currentRetryTimes),
                 result ->
                 {
                     //TODO default(Z)
@@ -84,7 +79,6 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 () -> String.format("sequence message [messageId:%s, messageType:%s, aggregateRootId:%s, aggregateRootVersion:%d]", processingMessage.getMessage().id(), processingMessage.getMessage().getClass().getName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
                 errorMessage ->
                         _logger.error(String.format("Update published version has unknown exception, the code should not be run to here, errorMessage: %s", errorMessage)),
-                retryTimes,
                 true);
     }
 }

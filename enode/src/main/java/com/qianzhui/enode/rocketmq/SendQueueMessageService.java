@@ -8,7 +8,6 @@ import com.alibaba.rocketmq.common.message.MessageQueue;
 import com.qianzhui.enode.common.io.AsyncTaskResult;
 import com.qianzhui.enode.common.io.AsyncTaskStatus;
 import com.qianzhui.enode.common.io.IOHelper;
-import com.qianzhui.enode.common.io.IORuntimeException;
 import com.qianzhui.enode.common.logging.ENodeLogger;
 import com.qianzhui.enode.rocketmq.client.Producer;
 import org.slf4j.Logger;
@@ -31,19 +30,16 @@ public class SendQueueMessageService {
     }
 
     public void sendMessage(Producer producer, Message message, String routingKey, String messageId, String version) {
-        try {
-            ioHelper.tryIOAction(() ->
-            {
-                SendResult result = producer.send(message, this::messageQueueSelect, routingKey);
 
-                if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
-                    logger.error("ENode message sync send failed, sendResult: {}, routingKey: {}, messageId: {}, version: {}", result, routingKey, messageId, version);
-                    throw new IORuntimeException(result.toString());
-                }
+        try {
+            SendResult result = producer.send(message, this::messageQueueSelect, routingKey);
+            if (!result.getSendStatus().equals(SendStatus.SEND_OK)) {
+                logger.error("ENode message sync send failed, sendResult: {}, routingKey: {}, messageId: {}, version: {}", result, routingKey, messageId, version);
+            } else {
                 logger.info("ENode message sync send success, sendResult: {}, routingKey: {}, messageId: {}, version: {}", result, routingKey, messageId, version);
-            }, "SendENodeMessage");
+            }
         } catch (Exception ex) {
-            logger.error(String.format("ENode message synch send has exception, message: {}, routingKey: {}, messageId: {}, version: {}", message, routingKey, messageId, version), ex);
+            logger.error(String.format("ENode message sync send has exception, message: {}, routingKey: {}, messageId: {}, version: {}", message, routingKey, messageId, version), ex);
             throw ex;
         }
     }
