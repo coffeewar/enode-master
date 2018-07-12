@@ -140,7 +140,8 @@ public class MysqlEventStore implements IEventStore {
                 , "QueryAggregateEventsAsync");
     }
 
-    public CompletableFuture<AsyncTaskResult<EventAppendResult>> batchAppendAsync(List<DomainEventStream> eventStreams) {
+    @Override
+    public AsyncTaskResult<EventAppendResult> batchAppend(List<DomainEventStream> eventStreams) {
         if (eventStreams.size() == 0) {
             throw new IllegalArgumentException("Event streams cannot be empty.");
         }
@@ -160,26 +161,21 @@ public class MysqlEventStore implements IEventStore {
                     _jsonSerializer.serialize(_eventSerializer.serialize(eventStream.events()))};
         }
 
-        return _ioHelper.tryIOFuncAsync(() ->
-                        CompletableFuture.supplyAsync(() -> {
-                            try {
-                                _queryRunner.batch(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(aggregateRootId)), params);
-                                return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.Success);
-                            } catch (SQLException ex) {
-                                if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
-                                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
-                                } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
-                                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
-                                }
-                                _logger.error("Batch append event has sql exception.", ex);
-                                return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
-                            } catch (Exception ex) {
-                                _logger.error("Batch append event has unknown exception.", ex);
-                                return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
-                            }
-                        }, executor)
-                , "BatchAppendEventsAsync");
-
+        try {
+            _queryRunner.batch(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(aggregateRootId)), params);
+            return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.Success);
+        } catch (SQLException ex) {
+            if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
+                return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
+            } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
+                return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
+            }
+            _logger.error("Batch append event has sql exception.", ex);
+            return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
+        } catch (Exception ex) {
+            _logger.error("Batch append event has unknown exception.", ex);
+            return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -219,79 +215,35 @@ public class MysqlEventStore implements IEventStore {
         Thread.sleep(20000);
     }
 
-    private ThreadLocal<CompletableFuture<?>> lastFutureThreadLocal = new ThreadLocal<CompletableFuture<?>>(){
-        @Override
-        protected CompletableFuture<?> initialValue() {
-            CompletableFuture<?> completableFuture = new CompletableFuture<>();
-            completableFuture.complete(null);
-            return completableFuture;
-        }
-    };
+    @Override
+    public AsyncTaskResult<EventAppendResult> append(DomainEventStream eventStream) {
+        return _ioHelper.tryIOFunc(()->doAppend(eventStream),"AppendEvents");
+    }
 
-    public CompletableFuture<AsyncTaskResult<EventAppendResult>> appendAsync(DomainEventStream eventStream) {
+    private AsyncTaskResult<EventAppendResult> doAppend(final DomainEventStream eventStream) {
         StreamRecord record = convertTo(eventStream);
+        try {
+            _queryRunner.update(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(record.getAggregateRootId())),
+                    record.getAggregateRootId(),
+                    record.getAggregateRootTypeName(),
+                    record.getCommandId(),
+                    record.getVersion(),
+                    record.getCreatedOn(),
+                    record.getEvents());
+            return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.Success);
+        } catch (SQLException ex) {
+            if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
+                return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
+            } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
+                return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
+            }
 
-        return _ioHelper.tryIOFuncAsync(() -> {
-            CompletableFuture<?> lastTask = lastFutureThreadLocal.get();
-
-            CompletableFuture<AsyncTaskResult<EventAppendResult>> future = lastTask.thenApply(result -> {
-                try {
-                    _queryRunner.update(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(record.getAggregateRootId())),
-                            record.getAggregateRootId(),
-                            record.getAggregateRootTypeName(),
-                            record.getCommandId(),
-                            record.getVersion(),
-                            record.getCreatedOn(),
-                            record.getEvents());
-
-                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.Success);
-                } catch (SQLException ex) {
-                    if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
-                        return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
-                    } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
-                        return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
-                    }
-
-                    _logger.error(String.format("Append event has sql exception, eventStream: %s", eventStream), ex);
-                    return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
-                } catch (Exception ex) {
-                    _logger.error(String.format("Append event has unknown exception, eventStream: %s", eventStream), ex);
-                    return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
-                }
-            });
-
-            lastFutureThreadLocal.set(future);
-
-            return future;
-        }, "AppendEventsAsync");
-
-        /*return _ioHelper.tryIOFuncAsync(() ->
-                        CompletableFuture.supplyAsync(() -> {
-                            try {
-                                _queryRunner.update(String.format("INSERT INTO %s(AggregateRootId,AggregateRootTypeName,CommandId,Version,CreatedOn,Events) VALUES(?,?,?,?,?,?)", getTableName(record.getAggregateRootId())),
-                                        record.getAggregateRootId(),
-                                        record.getAggregateRootTypeName(),
-                                        record.getCommandId(),
-                                        record.getVersion(),
-                                        record.getCreatedOn(),
-                                        record.getEvents());
-
-                                return new AsyncTaskResult(AsyncTaskStatus.Success, EventAppendResult.Success);
-                            } catch (SQLException ex) {
-                                if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_versionIndexName)) {
-                                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateEvent);
-                                } else if (ex.getErrorCode() == 1062 && ex.getMessage().contains(_commandIndexName)) {
-                                    return new AsyncTaskResult<>(AsyncTaskStatus.Success, EventAppendResult.DuplicateCommand);
-                                }
-
-                                _logger.error(String.format("Append event has sql exception, eventStream: %s", eventStream), ex);
-                                return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
-                            } catch (Exception ex) {
-                                _logger.error(String.format("Append event has unknown exception, eventStream: %s", eventStream), ex);
-                                return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
-                            }
-                        }, executor)
-                , "AppendEventsAsync");*/
+            _logger.error(String.format("Append event has sql exception, eventStream: %s", eventStream), ex);
+            return new AsyncTaskResult<>(AsyncTaskStatus.IOException, ex.getMessage(), EventAppendResult.Failed);
+        } catch (Exception ex) {
+            _logger.error(String.format("Append event has unknown exception, eventStream: %s", eventStream), ex);
+            return new AsyncTaskResult<>(AsyncTaskStatus.Failed, ex.getMessage(), EventAppendResult.Failed);
+        }
     }
 
     public CompletableFuture<AsyncTaskResult<DomainEventStream>> findAsync(String aggregateRootId, int version) {

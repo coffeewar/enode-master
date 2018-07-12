@@ -116,7 +116,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                     command.getAggregateRootId());
             handleSuccess = true;
         } catch (Exception ex) {
-            handleExceptionAsync(processingCommand, commandHandler, ex, 0);
+            handleExceptionAsync(processingCommand, commandHandler, ex);
             return;
         }
 
@@ -166,7 +166,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         //所以，我们要考虑到这种情况，尝试再次发布该命令产生的事件到MQ；
         //否则，如果我们直接将当前command设置为完成，即对MQ进行ack操作，那该command的事件就永远不会再发布到MQ了，这样就无法保证CQRS数据的最终一致性了。
         if (dirtyAggregateRootCount == 0 || changedEvents == null || changedEvents.size() == 0) {
-            processIfNoEventsOfCommand(processingCommand, 0);
+            processIfNoEventsOfCommand(processingCommand);
             return;
         }
 
@@ -177,7 +177,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         _eventService.commitDomainEventAsync(new EventCommittingContext(dirtyAggregateRoot, eventStream, processingCommand));
     }
 
-    private void processIfNoEventsOfCommand(ProcessingCommand processingCommand, int retryTimes) {
+    private void processIfNoEventsOfCommand(ProcessingCommand processingCommand) {
         ICommand command = processingCommand.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("ProcessIfNoEventsOfCommand",
@@ -211,7 +211,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                 processingCommand.getItems());
     }
 
-    private void handleExceptionAsync(ProcessingCommand processingCommand, ICommandHandlerProxy commandHandler, Exception exception, int retryTimes) {
+    private void handleExceptionAsync(ProcessingCommand processingCommand, ICommandHandlerProxy commandHandler, Exception exception) {
         ICommand command = processingCommand.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("FindEventByCommandIdAsync",
@@ -220,10 +220,9 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
                     DomainEventStream existingEventStream = result.getData();
 
                     if (existingEventStream != null) {
-                        //这里，我们需要再重新做一遍更新内存缓存以及发布事件这两个操作；
-                        //之所以要这样做是因为虽然该command产生的事件已经持久化成功，但并不表示已经内存也更新了或者事件已经发布出去了；
-                        //因为有可能事件持久化成功了，但那时正好机器断电了，则更新内存和发布事件都没有做；
-                        //_memoryCache.refreshAggregateFromEventStore(existingEventStream.aggregateRootTypeName(), existingEventStream.aggregateRootId());
+                        //这里，我们需要再重新做一遍发布事件这个操作；
+                        //之所以要这样做是因为虽然该command产生的事件已经持久化成功，但并不表示事件已经发布出去了；
+                        //因为有可能事件持久化成功了，但那时正好机器断电了，则发布事件就没有做；
                         _logger.info("handle command exception,and the command has consumed before,we will publish domain event again and try execute next command mailbox message.", exception);
                         _eventService.publishDomainEventAsync(processingCommand, existingEventStream);
                     } else {
@@ -237,7 +236,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
 
                         if (exp instanceof IPublishableException) {
                             IPublishableException publishableException = (IPublishableException) exp;
-                            publishExceptionAsync(processingCommand, publishableException, 0);
+                            publishExceptionAsync(processingCommand, publishableException);
                         } else {
                             logCommandExecuteException(processingCommand, commandHandler, exp);
                             completeCommand(processingCommand, CommandStatus.Failed, exp.getClass().getName(), exp.getMessage());
@@ -251,7 +250,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
 
     }
 
-    private void publishExceptionAsync(ProcessingCommand processingCommand, IPublishableException exception, int retryTimes) {
+    private void publishExceptionAsync(ProcessingCommand processingCommand, IPublishableException exception) {
         _ioHelper.tryAsyncActionRecursively("PublishExceptionAsync",
                 () -> _exceptionPublisher.publishAsync(exception),
                 result ->
@@ -307,10 +306,10 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     }*/
 
     private void handleCommand(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandHandler) {
-        handleCommandAsync(processingCommand, commandHandler, 0);
+        handleCommandAsync(processingCommand, commandHandler);
     }
 
-    private void handleCommandAsync(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandHandler, int retryTimes) {
+    private void handleCommandAsync(ProcessingCommand processingCommand, ICommandAsyncHandlerProxy commandHandler) {
         ICommand command = processingCommand.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("HandleCommandAsync",
@@ -350,7 +349,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
     private void commitChangesAsync(ProcessingCommand processingCommand, boolean success, IApplicationMessage message, String errorMessage) {
         if (success) {
             if (message != null) {
-                publishMessageAsync(processingCommand, message, 0);
+                publishMessageAsync(processingCommand, message);
             } else {
                 completeCommand(processingCommand, CommandStatus.Success, null, null);
             }
@@ -359,7 +358,7 @@ public class DefaultProcessingCommandHandler implements IProcessingCommandHandle
         }
     }
 
-    private void publishMessageAsync(ProcessingCommand processingCommand, IApplicationMessage message, int retryTimes) {
+    private void publishMessageAsync(ProcessingCommand processingCommand, IApplicationMessage message) {
         ICommand command = processingCommand.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("PublishApplicationMessageAsync",

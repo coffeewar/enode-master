@@ -140,22 +140,22 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
         Class handlerType = handlerProxy.getInnerObject().getClass();
         String handlerTypeName = _typeNameProvider.getTypeName(handlerType);
 
-        handleSingleMessageAsync(singleMessageDispatching, handlerProxy, handlerTypeName, messageTypeName, queueHandler, 0);
+        handleSingleMessageAsync(singleMessageDispatching, handlerProxy, handlerTypeName, messageTypeName, queueHandler);
     }
 
     private void dispatchTwoMessageToHandlerAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy2 handlerProxy, QueuedHandler<IMessageHandlerProxy2> queueHandler, int retryTimes) {
         Class handlerType = handlerProxy.getInnerObject().getClass();
         String handlerTypeName = _typeNameProvider.getTypeName(handlerType);
-        handleTwoMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler, 0);
+        handleTwoMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler);
     }
 
     private void dispatchThreeMessageToHandlerAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy3 handlerProxy, QueuedHandler<IMessageHandlerProxy3> queueHandler, int retryTimes) {
         Class handlerType = handlerProxy.getInnerObject().getClass();
         String handlerTypeName = _typeNameProvider.getTypeName(handlerType);
-        handleThreeMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler, 0);
+        handleThreeMessageAsync(multiMessageDispatching, handlerProxy, handlerTypeName, queueHandler);
     }
 
-    private void handleSingleMessageAsync(SingleMessageDispatching singleMessageDispatching, IMessageHandlerProxy1 handlerProxy, String handlerTypeName, String messageTypeName, QueuedHandler<IMessageHandlerProxy1> queueHandler, int retryTimes) {
+    private void handleSingleMessageAsync(SingleMessageDispatching singleMessageDispatching, IMessageHandlerProxy1 handlerProxy, String handlerTypeName, String messageTypeName, QueuedHandler<IMessageHandlerProxy1> queueHandler) {
         IMessage message = singleMessageDispatching.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("HandleSingleMessageAsync",
@@ -175,7 +175,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 true);
     }
 
-    private void handleTwoMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy2 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy2> queueHandler, int retryTimes) {
+    private void handleTwoMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy2 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy2> queueHandler) {
         IMessage[] messages = multiMessageDispatching.getMessages();
         IMessage message1 = messages[0];
         IMessage message2 = messages[1];
@@ -197,7 +197,7 @@ public class DefaultMessageDispatcher implements IMessageDispatcher {
                 true);
     }
 
-    private void handleThreeMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy3 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy3> queueHandler, int retryTimes) {
+    private void handleThreeMessageAsync(MultiMessageDisptaching multiMessageDispatching, IMessageHandlerProxy3 handlerProxy, String handlerTypeName, QueuedHandler<IMessageHandlerProxy3> queueHandler) {
         IMessage[] messages = multiMessageDispatching.getMessages();
         IMessage message1 = messages[0];
         IMessage message2 = messages[1];

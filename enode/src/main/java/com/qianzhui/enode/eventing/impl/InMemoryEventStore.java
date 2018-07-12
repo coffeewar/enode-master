@@ -51,6 +51,16 @@ public class InMemoryEventStore implements IEventStore {
         return aggregateInfo.getEventDict().entrySet().stream().filter(x -> x.getKey() >= min && x.getKey() <= max).map(x -> x.getValue()).collect(Collectors.toList());
     }
 
+    @Override
+    public AsyncTaskResult<EventAppendResult> batchAppend(List<DomainEventStream> eventStreams) {
+        return null;
+    }
+
+    @Override
+    public AsyncTaskResult<EventAppendResult> append(DomainEventStream eventStream) {
+        return null;
+    }
+
     public CompletableFuture<AsyncTaskResult<EventAppendResult>> batchAppendAsync(List<DomainEventStream> eventStreams) {
         BatchAppendFuture batchAppendFuture = new BatchAppendFuture();
 
@@ -101,7 +111,7 @@ public class InMemoryEventStore implements IEventStore {
     }
 
     public CompletableFuture<AsyncTaskResult<EventAppendResult>> appendAsync(DomainEventStream eventStream) {
-        return CompletableFuture.completedFuture(new AsyncTaskResult<>(AsyncTaskStatus.Success, null, append(eventStream)));
+        return CompletableFuture.completedFuture(new AsyncTaskResult<>(AsyncTaskStatus.Success, null, appends(eventStream)));
     }
 
     public CompletableFuture<AsyncTaskResult<DomainEventStream>> findAsync(String aggregateRootId, int version) {
@@ -116,7 +126,7 @@ public class InMemoryEventStore implements IEventStore {
         return CompletableFuture.completedFuture(new AsyncTaskResult<>(AsyncTaskStatus.Success, null, queryAggregateEvents(aggregateRootId, aggregateRootTypeName, minVersion, maxVersion)));
     }
 
-    private EventAppendResult append(DomainEventStream eventStream) {
+    private EventAppendResult appends(DomainEventStream eventStream) {
 //        AggregateInfo aggregateInfo = _aggregateInfoDict.putIfAbsent(eventStream.aggregateRootId(), new AggregateInfo());
         AggregateInfo aggregateInfo = _aggregateInfoDict.computeIfAbsent(eventStream.aggregateRootId(), key -> new AggregateInfo());
 

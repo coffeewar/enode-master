@@ -29,10 +29,10 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
     protected abstract CompletableFuture<AsyncTaskResult> dispatchProcessingMessageAsync(X processingMessage);
 
     public void handleAsync(X processingMessage) {
-        handleMessageAsync(processingMessage, 0);
+        handleMessageAsync(processingMessage);
     }
 
-    private void handleMessageAsync(X processingMessage, int retryTimes) {
+    private void handleMessageAsync(X processingMessage) {
         Y message = processingMessage.getMessage();
 
         _ioHelper.tryAsyncActionRecursively("GetPublishedVersionAsync",
@@ -41,7 +41,7 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 {
                     Integer publishedVersion = result.getData();
                     if (publishedVersion + 1 == message.version()) {
-                        dispatchProcessingMessageAsync(processingMessage, 0);
+                        doDispatchProcessingMessageAsync(processingMessage);
                     } else if (publishedVersion + 1 < message.version()) {
                         _logger.info("The sequence message cannot be process now as the version is not the next version, it will be handle later. contextInfo [aggregateRootId={},lastPublishedVersion={},messageVersion={}]", message.aggregateRootStringId(), publishedVersion, message.version());
                         processingMessage.addToWaitingList();
@@ -57,10 +57,10 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 true);
     }
 
-    private void dispatchProcessingMessageAsync(X processingMessage, int retryTimes) {
+    private void doDispatchProcessingMessageAsync(X processingMessage) {
         _ioHelper.tryAsyncActionRecursively("DispatchProcessingMessageAsync",
                 () -> dispatchProcessingMessageAsync(processingMessage),
-                result -> updatePublishedVersionAsync(processingMessage, 0),
+                result -> updatePublishedVersionAsync(processingMessage),
                 () -> String.format("sequence message [messageId:%s, messageType:%s, aggregateRootId:%s, aggregateRootVersion:%d]", processingMessage.getMessage().id(), processingMessage.getMessage().getClass().getName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
                 errorMessage ->
 
@@ -68,7 +68,7 @@ public abstract class AbstractSequenceProcessingMessageHandler<X extends IProces
                 true);
     }
 
-    private void updatePublishedVersionAsync(X processingMessage, int retryTimes) {
+    private void updatePublishedVersionAsync(X processingMessage) {
         _ioHelper.tryAsyncActionRecursively("UpdatePublishedVersionAsync",
                 () -> _publishedVersionStore.updatePublishedVersionAsync(getName(), processingMessage.getMessage().aggregateRootTypeName(), processingMessage.getMessage().aggregateRootStringId(), processingMessage.getMessage().version()),
                 result ->

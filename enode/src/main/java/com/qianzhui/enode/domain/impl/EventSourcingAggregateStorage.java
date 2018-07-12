@@ -67,7 +67,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
         List<DomainEventStream> eventStreams = _eventStore.queryAggregateEvents(aggregateRootId, aggregateRootTypeName, minVersion, maxVersion);
         aggregateRoot = rebuildAggregateRoot(aggregateRootType, eventStreams);
 
-        checkRepublishUnpublishedEventAsync(aggregateRoot, 0);
+        checkRepublishUnpublishedEventAsync(aggregateRoot);
 
         return aggregateRoot;
     }
@@ -89,7 +89,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
         List<DomainEventStream> eventStreamsAfterSnapshot = _eventStore.queryAggregateEvents(aggregateRootId, aggregateRootTypeName, aggregateRoot.version() + 1, Integer.MAX_VALUE);
         aggregateRoot.replayEvents(eventStreamsAfterSnapshot);
 
-        checkRepublishUnpublishedEventAsync(aggregateRoot, 0);
+        checkRepublishUnpublishedEventAsync(aggregateRoot);
 
         return aggregateRoot;
     }
@@ -103,7 +103,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
         return aggregateRoot;
     }
 
-    private void checkRepublishUnpublishedEventAsync(IAggregateRoot aggregateRoot, int retryTimes) {
+    private void checkRepublishUnpublishedEventAsync(IAggregateRoot aggregateRoot) {
         if (aggregateRoot == null)
             return;
 
@@ -113,7 +113,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
                 result -> {
                     Integer publishedVersion = result.getData();
                     if (publishedVersion < aggregateRoot.version()) {
-                        republishUnpublishedEvents(aggregateRoot, publishedVersion, 0);
+                        republishUnpublishedEvents(aggregateRoot, publishedVersion);
                     }
                 },
                 () -> String.format("AggregateRootType:%s,AggId:%s", aggregateRoot.getClass().getName(), aggregateRoot.uniqueId()),
@@ -121,7 +121,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
                 true);
     }
 
-    private void republishUnpublishedEvents(IAggregateRoot aggregateRoot, int publishedVersion, int retryTimes) {
+    private void republishUnpublishedEvents(IAggregateRoot aggregateRoot, int publishedVersion) {
         _ioHelper.tryAsyncActionRecursively("RepublishUnpublishedEvents",
                 () -> _eventStore.queryAggregateEventsAsync(aggregateRoot.uniqueId(), _typeNameProvider.getTypeName(aggregateRoot.getClass()),
                         publishedVersion + 1, aggregateRoot.version()),
@@ -129,7 +129,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
                         result.getData().stream().map(
                                 eventStream -> new DomainEventStreamMessage(eventStream.commandId(), eventStream.aggregateRootId(),
                                         eventStream.version(), eventStream.aggregateRootTypeName(), eventStream.events(), eventStream.items())
-                        ).forEach(eventStreamMessage -> republishUnpublishedEvent(eventStreamMessage, 0))
+                        ).forEach(eventStreamMessage -> republishUnpublishedEvent(eventStreamMessage))
                 ,
                 () -> String.format("AggregateRootType:%s,AggId:%s", aggregateRoot.getClass().getName(), aggregateRoot.uniqueId()),
                 errorMessage -> _logger.error("Republish unpublished event async has unknown exception, the code should not be run to here, errorMessage: {}", errorMessage),
@@ -137,7 +137,7 @@ public class EventSourcingAggregateStorage implements IAggregateStorage {
         );
     }
 
-    private void republishUnpublishedEvent(DomainEventStreamMessage eventStreamMessage, int retryTimes) {
+    private void republishUnpublishedEvent(DomainEventStreamMessage eventStreamMessage) {
         _ioHelper.tryAsyncActionRecursively("RepublishUnpublishedEvent",
                 () -> _domainEventPublisher.publishAsync(eventStreamMessage),
                 result -> {

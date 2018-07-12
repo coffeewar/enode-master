@@ -13,9 +13,9 @@ public interface IEventStore {
 
     List<DomainEventStream> queryAggregateEvents(String aggregateRootId, String aggregateRootTypeName, int minVersion, int maxVersion);
 
-    CompletableFuture<AsyncTaskResult<EventAppendResult>> batchAppendAsync(List<DomainEventStream> eventStreams);
+    AsyncTaskResult<EventAppendResult> batchAppend(List<DomainEventStream> eventStreams);
 
-    CompletableFuture<AsyncTaskResult<EventAppendResult>> appendAsync(DomainEventStream eventStream);
+    AsyncTaskResult<EventAppendResult> append(DomainEventStream eventStream);
 
     CompletableFuture<AsyncTaskResult<DomainEventStream>> findAsync(String aggregateRootId, int version);
 

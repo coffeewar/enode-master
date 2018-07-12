@@ -32,8 +32,11 @@ public class ProcessingCommandMailbox {
     private long _consumingSequence;
     private long _consumedSequence;
     private AtomicBoolean _isRunning;
-    private volatile boolean _isPaused;
     private volatile boolean _isProcessingCommand;
+    //已终止命令处理
+    private volatile boolean _isPaused;
+    //命令终止中标志
+    private volatile boolean _inPausing;
     private Date _lastActiveTime;
 
     public String getAggregateRootId() {
@@ -70,12 +73,14 @@ public class ProcessingCommandMailbox {
 
     public void pause() {
         _lastActiveTime = new Date();
+        _inPausing = true;
         _pauseWaitHandle.reset();
         while (_isProcessingCommand) {
             _logger.info("Request to pause the command mailbox, but the mailbox is currently processing command, so we should wait for a while, aggregateRootId: {}", _aggregateRootId);
             _processingWaitHandle.waitOne(1000);
         }
         _isPaused = true;
+        _inPausing = false;
     }
 
     public void resume() {
@@ -128,9 +133,9 @@ public class ProcessingCommandMailbox {
             int count = 0;
 
             while (_consumingSequence < _nextSequence && count < _batchSize) {
-                if(_requestToCompleteCommandDict.containsKey(_consumingSequence)) {
-                    _consumingSequence++;
-                    continue;
+                if(_inPausing) {
+                    _logger.info("Command mailbox is pausing and we should exit batch loop, aggregateRootId: {}", _aggregateRootId);
+                    break;
                 }
                 processingCommand = getProcessingCommand(_consumingSequence);
 

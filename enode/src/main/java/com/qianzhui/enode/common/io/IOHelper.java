@@ -27,6 +27,16 @@ public class IOHelper {
             Action1<TAsyncResult> successAction,
             Func<String> getContextInfoFunc,
             Action1<String> failedAction,
+            boolean retryWhenFailed) {
+        tryActionRecursively(actionName, action, successAction, getContextInfoFunc, failedAction, retryWhenFailed, 3, 1000);
+    }
+
+    public static <TAsyncResult extends AsyncTaskResult> void tryActionRecursively(
+            String actionName,
+            Func<TAsyncResult> action,
+            Action1<TAsyncResult> successAction,
+            Func<String> getContextInfoFunc,
+            Action1<String> failedAction,
             boolean retryWhenFailed,
             int maxRetryTimes,
             int retryInterval) {
