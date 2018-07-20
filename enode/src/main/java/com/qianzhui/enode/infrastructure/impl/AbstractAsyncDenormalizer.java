@@ -71,6 +71,7 @@ public abstract class AbstractAsyncDenormalizer {
         return CompletableFuture.supplyAsync(() -> {
 
             try (Connection connection = ds.getConnection()) {
+                boolean autoCommit = connection.getAutoCommit();
                 connection.setAutoCommit(false);
 
                 try {
@@ -84,6 +85,10 @@ public abstract class AbstractAsyncDenormalizer {
                 } catch (SQLException ex) {
                     connection.rollback();
                     throw new IORuntimeException(ex.getMessage(), ex);
+                } finally {
+                    if(autoCommit) {
+                        connection.setAutoCommit(true);
+                    }
                 }
             } catch (SQLException ex) {
                 throw new IORuntimeException(ex.getMessage(), ex);
