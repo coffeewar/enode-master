@@ -12,6 +12,7 @@ import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
 import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
+import com.qianzhui.enode.rocketmq.command.CommandService;
 
 import javax.inject.Inject;
 import java.util.concurrent.CompletableFuture;
@@ -63,12 +64,18 @@ public class ApplicationMessagePublisher implements IMessagePublisher<IApplicati
 
         String data = _jsonSerializer.serialize(appDataMessage);
 
-        return new Message(topicTagData.getTopic(), //topic
+        Message mqMessage =  new Message(topicTagData.getTopic(), //topic
                 //_typeNameProvider.getTypeName(message.getClass()), //tags
                 topicTagData.getTag(), //tag
                 message.id(), // keys
                 RocketMQMessageTypeCode.ApplicationMessage.getValue(), // flag
                 BitConverter.getBytes(data), // body
                 true);
+
+        if (message.getStartDeliverTime() > 0) {
+            mqMessage.putUserProperty(CommandService.RocketMQSystemPropKey.STARTDELIVERTIME, String.valueOf(message.getStartDeliverTime()));
+        }
+
+        return mqMessage;
     }
 }
