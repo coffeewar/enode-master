@@ -28,8 +28,8 @@ public class ProcessingCommandMailbox {
     private final ManualResetEvent _pauseWaitHandle;
     private final ManualResetEvent _processingWaitHandle;
     private final int _batchSize;
-    private long _nextSequence;
-    private long _consumingSequence;
+    private volatile long _nextSequence;
+    private volatile long _consumingSequence;
     private long _consumedSequence;
     private AtomicBoolean _isRunning;
     private volatile boolean _isProcessingCommand;
