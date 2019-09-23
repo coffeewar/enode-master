@@ -14,6 +14,7 @@ import com.qianzhui.enode.rocketmq.RocketMQMessageTypeCode;
 import com.qianzhui.enode.rocketmq.SendQueueMessageService;
 import com.qianzhui.enode.rocketmq.TopicTagData;
 import com.qianzhui.enode.rocketmq.client.Producer;
+import com.qianzhui.enode.rocketmq.trace.core.utils.MixUtils;
 
 import javax.inject.Inject;
 import java.net.*;
@@ -215,33 +216,17 @@ public class CommandService implements ICommandService {
             InetAddress localAddress = socketAddress.getAddress();
 
             if (!isSiteLocalAddress(localAddress)) {
-                try {
-                    localAddress = getIp4LocalAddress();
-                } catch (UnknownHostException e) {
-                    throw new WrappedRuntimeException("No local address found", e);
+                String strLocalAddress = MixUtils.getLocalAddress();
+                if(strLocalAddress == null) {
+                    throw new RuntimeException("No local address found");
+                } else {
+                    return String.format("%s:%d",strLocalAddress, port);
                 }
             }
             return String.format("%s:%d", localAddress.getHostAddress(), port);
         } else {
             throw new RuntimeException("Unknow socket address:" + address);
         }
-    }
-
-    private InetAddress getIp4LocalAddress() throws UnknownHostException {
-        return Inet4Address.getLocalHost();
-        /*Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-        while(networkInterfaces.hasMoreElements()){
-            NetworkInterface nextElement = networkInterfaces.nextElement();
-
-            Enumeration<InetAddress> inetAddresses = nextElement.getInetAddresses();
-            while(inetAddresses.hasMoreElements()){
-                InetAddress inetAddress = inetAddresses.nextElement();
-                if(isSiteLocalAddress(inetAddress))
-                    return inetAddress;
-            }
-        }
-
-        return null;*/
     }
 
     private boolean isSiteLocalAddress(InetAddress address) {

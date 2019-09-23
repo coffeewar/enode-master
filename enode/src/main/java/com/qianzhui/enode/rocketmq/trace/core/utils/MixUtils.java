@@ -49,7 +49,8 @@ public class MixUtils {
                         }
 
                         ip1 = (String)localHost3.next();
-                    } while(ip1.startsWith("127.0") || ip1.startsWith("192.168"));
+                    //} while(ip1.startsWith("127.0") || ip1.startsWith("192.168"));
+                    } while(ip1.startsWith("127.0"));
 
                     return ip1;
                 }
